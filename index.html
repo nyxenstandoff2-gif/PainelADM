@@ -350,7 +350,8 @@
           </div>
         </div>
         <div class="card">
-          <div id="users-table-wrapper">
+          <!-- Desktop Table -->
+          <div id="users-table-wrapper" class="desktop-only">
             <table class="data-table" id="users-table">
               <thead>
                 <tr>
@@ -366,6 +367,10 @@
               </thead>
               <tbody id="users-tbody"></tbody>
             </table>
+          </div>
+          <!-- Mobile Cards -->
+          <div id="users-cards-wrapper" class="mobile-only">
+            <div id="users-cards-list"></div>
           </div>
           <p id="no-users-msg" class="empty-state hidden">Nenhum usuário cadastrado.</p>
         </div>

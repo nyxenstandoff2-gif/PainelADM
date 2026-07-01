@@ -930,44 +930,62 @@ function renderUsersTable(users) {
   };
   
   if (isMobile) {
-    // Mobile: render as cards
-    tbody.innerHTML = users.map(u => {
+    // Mobile: render as cards in separate container
+    const cardsList = $('#users-cards-list');
+    cardsList.innerHTML = users.map(u => {
       const isBlocked = u.status === 'blocked';
-      const baseActions = isBlocked 
-        ? `<button class="action-btn" onclick="viewBlockedUser('${u.id}')" title="Ver Detalhes" style="flex: 1; justify-content: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c;">👁️</button>
-           <button class="action-btn" onclick="reactivateUser('${u.id}')" title="Reativar" style="flex: 1; justify-content: center; background: rgba(46, 204, 113, 0.1); color: #2ecc71;">✅</button>`
-        : `<button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar" style="flex: 1; justify-content: center;">✏️</button>
-           <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir" style="flex: 1; justify-content: center;">🗑️</button>`;
+      const cardClass = isBlocked ? 'user-card blocked' : 'user-card';
+      
+      const statusBadge = u.status === 'active' 
+        ? '<span class="status-badge status-active">Ativo</span>'
+        : u.status === 'blocked' 
+        ? '<span class="status-badge status-blocked">Bloqueado</span>'
+        : '<span class="status-badge status-pending">Pendente</span>';
       
       const roleAction = getRoleActionButton(u);
       
+      const actions = isBlocked
+        ? `<button class="btn btn-outline btn-sm" onclick="viewBlockedUser('${u.id}')" style="flex: 1;">👁️ Detalhes</button>
+           <button class="btn btn-accent btn-sm" onclick="reactivateUser('${u.id}')" style="flex: 1;">✅ Reativar</button>`
+        : `<button class="btn btn-outline btn-sm" onclick="openEditUser('${u.id}')" style="flex: 1;">✏️ Editar</button>
+           <button class="btn btn-danger btn-sm" onclick="openDeleteUser('${u.id}')" style="flex: 1;">🗑️ Excluir</button>
+           ${roleAction}`;
+      
       return `
-        <tr>
-          <td colspan="8">
-            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <strong style="color: var(--text-primary);">${u.nick || u.nome}</strong>
-                <div style="display: flex; gap: 0.4rem; align-items: center;">
-                  ${getRoleBadge(u)}
-                  <span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">
-                    ${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}
-                  </span>
-                </div>
-              </div>
-              <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                ${u.nome}<br>
-                ID: ${u.contaid || '-'} • ${u.whatsapp || '-'}
-              </div>
-              ${isBlocked && u.deleteReason ? `<div style="font-size: 0.75rem; color: #e74c3c; margin-top: 0.2rem;">Motivo: ${u.deleteReason}</div>` : ''}
-              <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
-                ${baseActions}
-                ${roleAction}
-              </div>
+        <div class="${cardClass}">
+          <div class="user-card-header">
+            <div class="user-card-identity">
+              <div class="user-card-nick">${u.nick || u.nome}</div>
+              <div class="user-card-name">${u.nome !== u.nick ? u.nome : ''}</div>
             </div>
-          </td>
-        </tr>
+            <div class="user-card-badges">
+              ${getRoleBadge(u)}
+              ${statusBadge}
+            </div>
+          </div>
+          <div class="user-card-info">
+            <div class="user-card-info-row">
+              <span class="user-card-info-label">ID Conta</span>
+              <span class="user-card-info-value">${u.contaid || '-'}</span>
+            </div>
+            <div class="user-card-info-row">
+              <span class="user-card-info-label">Email</span>
+              <span class="user-card-info-value">${u.email || '-'}</span>
+            </div>
+            <div class="user-card-info-row">
+              <span class="user-card-info-label">WhatsApp</span>
+              <span class="user-card-info-value">${u.whatsapp || '-'}</span>
+            </div>
+          </div>
+          ${isBlocked && u.deleteReason ? `<div class="user-card-reason"><strong>Motivo:</strong> ${u.deleteReason}</div>` : ''}
+          <div class="user-card-actions">
+            ${actions}
+          </div>
+        </div>
       `;
     }).join('');
+    
+    // CSS handles visibility via .desktop-only / .mobile-only
   } else {
     // Desktop: render as table
     tbody.innerHTML = users.map(u => {
