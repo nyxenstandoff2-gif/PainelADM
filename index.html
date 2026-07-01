@@ -6,7 +6,7 @@
   <title>Painel ADM - Clan</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=4">
 </head>
 <body>
 
@@ -180,6 +180,10 @@
         <a href="#" class="nav-item admin-only hidden" data-tab="aprovacoes">
           <span class="nav-icon">✅</span>
           <span class="nav-label">Aprovações</span>
+        </a>
+        <a href="#" class="nav-item admin-only hidden" data-tab="historico">
+          <span class="nav-icon">📋</span>
+          <span class="nav-label">Histórico</span>
         </a>
         <a href="#" class="nav-item" data-tab="configuracoes">
           <span class="nav-icon">⚙</span>
@@ -458,6 +462,17 @@
               </div>
               <div class="form-row">
                 <div class="form-group">
+                  <label for="eprof-contaid">ID da Conta</label>
+                  <input type="text" id="eprof-contaid" required maxlength="9" pattern="[0-9]{1,9}">
+                </div>
+                <div class="form-group">
+                  <label for="eprof-email">Email</label>
+                  <input type="email" id="eprof-email" required>
+                  <span class="field-hint">Email será usado para login</span>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
                   <label for="eprof-whatsapp">WhatsApp</label>
                   <input type="text" id="eprof-whatsapp" required pattern="[0-9]+">
                 </div>
@@ -481,17 +496,30 @@
           </div>
         </div>
 
-        <!-- Admin Settings (only for ADM) -->
+        <!-- Admin Settings -->
         <div id="admin-settings" class="card hidden">
           <h3>Configurações de ADM</h3>
-          <div class="form-group">
-            <label for="admin-whatsapp-number">WhatsApp para recebimento de cadastros</label>
-            <div class="inline-form">
-              <input type="text" id="admin-whatsapp-number" placeholder="5511999999999" pattern="[0-9]+">
-              <button id="btn-save-admin-whatsapp" class="btn btn-primary btn-sm">Salvar</button>
-            </div>
-            <span class="field-hint">Número onde os dados de cadastro serão enviados via WhatsApp</span>
+          <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            O número de WhatsApp cadastrado nesta conta será usado automaticamente para receber novos cadastros via WhatsApp.
+          </p>
+        </div>
+      </section>
+
+      <!-- TAB: Histórico (Admin Only) -->
+      <section id="tab-historico" class="tab-content hidden">
+        <div class="tab-header">
+          <h2>📋 Histórico de Cadastros</h2>
+          <div class="tab-actions">
+            <select id="filter-history-type" class="search-input">
+              <option value="all">Todos</option>
+              <option value="approved">Aprovados</option>
+              <option value="rejected">Recusados</option>
+              <option value="deleted">Apagados</option>
+            </select>
           </div>
+        </div>
+        <div id="history-list" class="card">
+          <p class="empty-state">Nenhum registro no histórico.</p>
         </div>
       </section>
     </main>

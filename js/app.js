@@ -4,7 +4,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged
+  signOut, onAuthStateChanged, updateEmail
 } from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js';
 import {
   getFirestore, collection, doc, addDoc, getDoc, getDocs,
@@ -33,6 +33,7 @@ const state = {
   allUsers: [],
   pendingUsers: [],
   drawHistory: [],
+  registrationHistory: [],
   admins: [],
   currentTab: 'sorteio',
   selectedParticipants: new Set(),
@@ -167,11 +168,6 @@ function updateUIForRole() {
   $('#prof-nascimento').textContent = p.nascimento ? formatBirth(p.nascimento) : '-';
   $('#prof-status').textContent = p._pending ? 'Pendente' : (p.status || 'Ativo');
 
-  // Load admin WhatsApp setting
-  if (state.isAdmin && p.adminWhatsapp) {
-    $('#admin-whatsapp-number').value = p.adminWhatsapp;
-  }
-
   // Load draw participants list
   loadParticipantsList();
   loadDrawHistory();
@@ -185,6 +181,79 @@ function formatBirth(b) {
 }
 
 // ============================================
+// REGISTRATION HISTORY
+// ============================================
+async function saveRegistrationHistory(action, userData, reason = '', observation = '') {
+  try {
+    await addDoc(collection(db, 'registrationHistory'), {
+      action, // 'approved', 'rejected', 'deleted'
+      userName: userData.nome || userData.nick || 'Usuário',
+      userNick: userData.nick || '',
+      userEmail: userData.email || '',
+      userContaid: userData.contaid || '',
+      reason,
+      observation,
+      performedBy: state.userProfile?.nome || state.userProfile?.nick || 'ADM',
+      performedByUid: state.currentUser?.uid || '',
+      date: new Date().toISOString(),
+      dateStr: nowFormatted()
+    });
+  } catch (err) {
+    console.error('Error saving registration history:', err);
+  }
+}
+
+async function loadRegistrationHistory() {
+  try {
+    const snap = await getDocs(collection(db, 'registrationHistory'));
+    const history = [];
+    snap.forEach(d => history.push({ id: d.id, ...d.data() }));
+    history.sort((a, b) => new Date(b.date) - new Date(a.date));
+    state.registrationHistory = history;
+    renderRegistrationHistory(history);
+  } catch (err) {
+    console.error('Error loading registration history:', err);
+  }
+}
+
+function renderRegistrationHistory(history) {
+  const container = $('#history-list');
+  if (!history || history.length === 0) {
+    container.innerHTML = '<p class="empty-state">Nenhum registro no histórico.</p>';
+    return;
+  }
+  
+  container.innerHTML = history.map(h => {
+    let actionClass = '';
+    let actionLabel = '';
+    if (h.action === 'approved') {
+      actionClass = 'status-active';
+      actionLabel = '✓ Aprovado';
+    } else if (h.action === 'rejected') {
+      actionClass = 'status-pending';
+      actionLabel = '✗ Recusado';
+    } else if (h.action === 'deleted') {
+      actionClass = 'status-blocked';
+      actionLabel = '⊘ Apagado';
+    }
+    
+    return `
+      <div class="history-item">
+        <div>
+          <span class="history-winner">${h.userName || h.userNick}</span>
+          <span class="status-badge ${actionClass}" style="margin-left: 0.5rem;">${actionLabel}</span>
+          ${h.reason ? `<div style="margin-top: 0.3rem; font-size: 0.85rem; color: var(--text-secondary);">Motivo: ${h.reason}</div>` : ''}
+          ${h.observation ? `<div style="font-size: 0.85rem; color: var(--text-muted);">Obs: ${h.observation}</div>` : ''}
+        </div>
+        <div class="history-meta">
+          ${h.dateStr || ''} • Por: ${h.performedBy || 'ADM'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================
 // REGISTRATION
 // ============================================
 async function loadAdminsList() {
@@ -194,8 +263,8 @@ async function loadAdminsList() {
     state.admins = [];
     snap.forEach(d => {
       const data = d.data();
-      if (data.adminWhatsapp) {
-        state.admins.push({ id: d.id, nome: data.nome, nick: data.nick, whatsapp: data.adminWhatsapp });
+      if (data.whatsapp && data.whatsapp !== '0') {
+        state.admins.push({ id: d.id, nome: data.nome, nick: data.nick, whatsapp: data.whatsapp });
       }
     });
     // Also populate the register form dropdown
@@ -204,7 +273,7 @@ async function loadAdminsList() {
     state.admins.forEach(a => {
       const opt = document.createElement('option');
       opt.value = a.id;
-      opt.textContent = `${a.nick || a.nome} (WhatsApp)`;
+      opt.textContent = `${a.nick || a.nome}`;
       opt.dataset.whatsapp = a.whatsapp;
       sel.appendChild(opt);
     });
@@ -653,10 +722,16 @@ async function handleDeleteUser(e) {
       deletedAt: serverTimestamp()
     });
 
+    // Save to registration history
+    if (u) {
+      await saveRegistrationHistory('deleted', u, reason, observacao);
+    }
+
     hide($('#modal-delete-user'));
     toast('Usuário excluído com sucesso.', 'success');
     loadUsersTable();
     loadParticipantsList();
+    loadRegistrationHistory();
   } catch (err) {
     toast('Erro ao excluir usuário.', 'error');
   }
@@ -721,11 +796,15 @@ window.approvePending = async function(pendingId, uid) {
       createdAt: serverTimestamp()
     });
 
+    // Save to registration history
+    await saveRegistrationHistory('approved', data);
+
     // Remove pending
     await deleteDoc(doc(db, 'pendingUsers', pendingId));
     toast('Usuário aprovado com sucesso!', 'success');
     loadPendingUsers();
     loadParticipantsList();
+    loadRegistrationHistory();
   } catch (err) {
     toast('Erro ao aprovar usuário.', 'error');
   }
@@ -733,10 +812,18 @@ window.approvePending = async function(pendingId, uid) {
 
 window.rejectPending = async function(pendingId, uid) {
   try {
+    const pendingDoc = await getDoc(doc(db, 'pendingUsers', pendingId));
+    const data = pendingDoc.exists() ? pendingDoc.data() : {};
+    
     await deleteDoc(doc(db, 'pendingUsers', pendingId));
+    
+    // Save to registration history
+    await saveRegistrationHistory('rejected', data);
+    
     // If user auth exists, we could also delete it but that requires admin SDK
     toast('Cadastro rejeitado.', 'info');
     loadPendingUsers();
+    loadRegistrationHistory();
   } catch (err) {
     toast('Erro ao rejeitar.', 'error');
   }
@@ -750,6 +837,8 @@ function openEditProfile() {
   if (!p) return;
   $('#eprof-nome').value = p.nome || '';
   $('#eprof-nick').value = p.nick || '';
+  $('#eprof-contaid').value = p.contaid || '';
+  $('#eprof-email').value = p.email || '';
   $('#eprof-whatsapp').value = p.whatsapp || '';
   $('#eprof-nascimento').value = p.nascimento || '';
   $('#eprof-genero').value = p.genero || 'masculino';
@@ -759,42 +848,47 @@ function openEditProfile() {
 async function handleEditProfile(e) {
   e.preventDefault();
   const uid = state.currentUser.uid;
+  const newEmail = $('#eprof-email').value.trim();
+  const oldEmail = state.userProfile.email;
+  
   try {
+    // Update Firestore document with all fields
     await updateDoc(doc(db, 'users', uid), {
       nome: $('#eprof-nome').value.trim(),
       nick: $('#eprof-nick').value.trim(),
+      contaid: $('#eprof-contaid').value.trim(),
+      email: newEmail,
       whatsapp: $('#eprof-whatsapp').value.trim(),
       nascimento: $('#eprof-nascimento').value.trim(),
       genero: $('#eprof-genero').value,
       updatedAt: serverTimestamp()
     });
+    
+    // If email changed, update Firebase Auth
+    if (newEmail !== oldEmail) {
+      const user = auth.currentUser;
+      await updateEmail(user, newEmail);
+      toast('Email atualizado com sucesso!', 'success');
+    } else {
+      toast('Dados atualizados!', 'success');
+    }
+    
     hide($('#modal-edit-profile'));
-    toast('Dados atualizados!', 'success');
     await loadUserProfile(uid);
+    loadAdminsList();
   } catch (err) {
-    toast('Erro ao atualizar dados.', 'error');
+    console.error('Error updating profile:', err);
+    if (err.code === 'auth/requires-recent-login') {
+      toast('Por segurança, faça login novamente para alterar o email.', 'error');
+    } else {
+      toast('Erro ao atualizar dados.', 'error');
+    }
   }
 }
 
 // ============================================
 // ADMIN WHATSAPP SETTING
 // ============================================
-async function saveAdminWhatsapp() {
-  const val = $('#admin-whatsapp-number').value.trim();
-  if (!/^[0-9]+$/.test(val)) return toast('Número inválido.', 'error');
-  try {
-    await updateDoc(doc(db, 'users', state.currentUser.uid), {
-      adminWhatsapp: val,
-      updatedAt: serverTimestamp()
-    });
-    state.userProfile.adminWhatsapp = val;
-    toast('WhatsApp do ADM salvo!', 'success');
-    loadAdminsList();
-  } catch (err) {
-    toast('Erro ao salvar.', 'error');
-  }
-}
-
 // ============================================
 // CLOCK UPDATE
 // ============================================
@@ -828,6 +922,7 @@ function bindEvents() {
       switchTab(item.dataset.tab);
       if (item.dataset.tab === 'aprovacoes') loadPendingUsers();
       if (item.dataset.tab === 'gerenciamento') loadUsersTable();
+      if (item.dataset.tab === 'historico') loadRegistrationHistory();
     });
   });
 
@@ -844,6 +939,8 @@ function bindEvents() {
   $('#edit-nascimento').addEventListener('input', maskOnlyNumbers);
   $('#eprof-nome').addEventListener('input', maskOnlyLetters);
   $('#eprof-nick').addEventListener('input', maskAlphaNum);
+  $('#eprof-contaid').addEventListener('input', maskOnlyNumbers);
+  $('#eprof-email').addEventListener('input', (e) => { /* email validation handled by type */ });
   $('#eprof-whatsapp').addEventListener('input', maskOnlyNumbers);
   $('#eprof-nascimento').addEventListener('input', maskOnlyNumbers);
 
@@ -884,8 +981,16 @@ function bindEvents() {
   // Profile edit
   $('#btn-edit-profile').addEventListener('click', openEditProfile);
 
-  // Admin WhatsApp
-  $('#btn-save-admin-whatsapp').addEventListener('click', saveAdminWhatsapp);
+  // History filter
+  $('#filter-history-type').addEventListener('change', (e) => {
+    const filterType = e.target.value;
+    if (filterType === 'all') {
+      renderRegistrationHistory(state.registrationHistory || []);
+    } else {
+      const filtered = (state.registrationHistory || []).filter(h => h.action === filterType);
+      renderRegistrationHistory(filtered);
+    }
+  });
 
   // Search users
   $('#search-users').addEventListener('input', (e) => {
