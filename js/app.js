@@ -309,20 +309,26 @@ async function loadAdminsList() {
     state.admins = [];
     snap.forEach(d => {
       const data = d.data();
-      if (data.whatsapp && data.whatsapp !== '0') {
-        state.admins.push({ id: d.id, nome: data.nome, nick: data.nick, whatsapp: data.whatsapp });
+      // Só incluir ADMs com WhatsApp válido e atualizado no Firebase
+      // WhatsApp deve ter números reais (mínimo 8 dígitos), não pode ser vazio, '0', ou placeholder
+      const wa = (data.whatsapp || '').toString().trim();
+      const hasValidWhatsapp = wa.length >= 8 && /^[0-9]+$/.test(wa);
+      if (hasValidWhatsapp) {
+        state.admins.push({ id: d.id, nome: data.nome, nick: data.nick, whatsapp: wa });
       }
     });
     // Also populate the register form dropdown
     const sel = $('#reg-adm-destino');
-    sel.innerHTML = '<option value="">Selecione um ADM...</option>';
-    state.admins.forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a.id;
-      opt.textContent = `${a.nick || a.nome}`;
-      opt.dataset.whatsapp = a.whatsapp;
-      sel.appendChild(opt);
-    });
+    if (sel) {
+      sel.innerHTML = '<option value="">Selecione um ADM...</option>';
+      state.admins.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = `${a.nick || a.nome}`;
+        opt.dataset.whatsapp = a.whatsapp;
+        sel.appendChild(opt);
+      });
+    }
   } catch (err) {
     console.error('Error loading admins:', err);
   }
@@ -1465,6 +1471,9 @@ function initAuthListener() {
       state.userProfile = null;
       state.isAdmin = false;
       showScreen('login');
+      // Carregar lista de ADMs com WhatsApp para o formulario de cadastro
+      // (nao depende do ADM estar online no site - envio 24h via WhatsApp)
+      loadAdminsList();
     }
   });
 }
