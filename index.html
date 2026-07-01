@@ -190,6 +190,10 @@
           <span class="nav-icon">📋</span>
           <span class="nav-label">Histórico</span>
         </a>
+        <a href="#" class="nav-item admin-only hidden" data-tab="codigos">
+          <span class="nav-icon">🎫</span>
+          <span class="nav-label">Códigos</span>
+        </a>
         <a href="#" class="nav-item" data-tab="configuracoes">
           <span class="nav-icon">⚙</span>
           <span class="nav-label">Configurações</span>
@@ -716,6 +720,49 @@
         </div>
         <div id="history-list" class="card">
           <p class="empty-state">Nenhum registro no histórico.</p>
+        </div>
+      </section>
+
+      <!-- TAB: Códigos (Admin Only) -->
+      <section id="tab-codigos" class="tab-content hidden">
+        <div class="tab-header">
+          <h2>🎫 Gerenciamento de Códigos</h2>
+        </div>
+
+        <!-- Formulário de Cadastro -->
+        <div class="card">
+          <h3>Cadastrar Novo Código</h3>
+          <form id="form-register-code">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="code-value">Código <span class="req">*</span></label>
+                <input type="text" id="code-value" placeholder="Ex: ABC123XYZ" required pattern="[A-Za-z0-9]+">
+                <span class="field-hint">Letras (maiúsculas/minúsculas) e números</span>
+              </div>
+              <div class="form-group">
+                <label for="code-gold">Valor em Gold <span class="req">*</span></label>
+                <input type="number" id="code-gold" placeholder="0 G" step="1" min="1" required>
+                <span class="field-hint">Valor que o código resgata</span>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">💾 Cadastrar Código</button>
+          </form>
+        </div>
+
+        <!-- Códigos Pendentes -->
+        <div class="card">
+          <h3>Códigos Pendentes</h3>
+          <div id="pending-codes-list">
+            <p class="empty-state">Nenhum código pendente.</p>
+          </div>
+        </div>
+
+        <!-- Histórico de Códigos Resgatados -->
+        <div class="card">
+          <h3>Histórico de Códigos Resgatados</h3>
+          <div id="redeemed-codes-list">
+            <p class="empty-state">Nenhum código resgatado ainda.</p>
+          </div>
         </div>
       </section>
     </main>

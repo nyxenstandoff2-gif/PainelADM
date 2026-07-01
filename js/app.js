@@ -28,7 +28,7 @@ const db = getFirestore(app);
 // === Master Admin Config ===
 // O ADM Master é o único que pode promover/rebaixar outros ADMs
 // Ele não aparece na lista de usuários comuns
-const MASTER_EMAIL = 'santosmattheuss@gmail.com';
+const MASTER_EMAIL = 'ssantosmattheuss@gmail.com';
 
 // Verifica se o usuário logado é o ADM Master
 function isMasterAdmin() {
@@ -1385,6 +1385,161 @@ window.rejectPending = async function(pendingId, uid) {
 };
 
 // ============================================
+// CODES MANAGEMENT (Admin)
+// ============================================
+async function handleRegisterCode(e) {
+  e.preventDefault();
+  const codeValue = $('#code-value').value.trim().toUpperCase();
+  const goldValue = parseFloat($('#code-gold').value) || 0;
+
+  // Validações
+  if (!/^[A-Za-z0-9]+$/.test(codeValue)) {
+    return toast('Código deve conter apenas letras e números.', 'error');
+  }
+  if (goldValue <= 0) {
+    return toast('Valor em Gold deve ser maior que zero.', 'error');
+  }
+
+  try {
+    // Verificar se código já existe (pendente ou resgatado)
+    const qPending = query(collection(db, 'codes'), where('code', '==', codeValue), where('status', '==', 'pending'));
+    const snapPending = await getDocs(qPending);
+    if (!snapPending.empty) {
+      return toast('Este código já existe e está pendente.', 'error');
+    }
+
+    const qRedeemed = query(collection(db, 'codes'), where('code', '==', codeValue), where('status', '==', 'redeemed'));
+    const snapRedeemed = await getDocs(qRedeemed);
+    if (!snapRedeemed.empty) {
+      return toast('Este código já foi resgatado anteriormente.', 'error');
+    }
+
+    // Cadastrar código
+    await addDoc(collection(db, 'codes'), {
+      code: codeValue,
+      goldValue: goldValue,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      createdBy: state.currentUser.uid,
+      createdByName: state.userProfile.nome || state.userProfile.nick || 'ADM'
+    });
+
+    toast('Código cadastrado com sucesso!', 'success');
+    e.target.reset();
+    loadCodes();
+  } catch (err) {
+    console.error('Error registering code:', err);
+    toast('Erro ao cadastrar código.', 'error');
+  }
+}
+
+async function loadCodes() {
+  try {
+    const snap = await getDocs(collection(db, 'codes'));
+    const codes = [];
+    snap.forEach(d => codes.push({ id: d.id, ...d.data() }));
+    
+    // Separar pendentes e resgatados
+    const pendingCodes = codes.filter(c => c.status === 'pending')
+      .sort((a, b) => new Date(b.createdAt?.seconds * 1000 || 0) - new Date(a.createdAt?.seconds * 1000 || 0));
+    
+    const redeemedCodes = codes.filter(c => c.status === 'redeemed')
+      .sort((a, b) => new Date(b.redeemedAt?.seconds * 1000 || 0) - new Date(a.redeemedAt?.seconds * 1000 || 0));
+
+    renderPendingCodes(pendingCodes);
+    renderRedeemedCodes(redeemedCodes);
+  } catch (err) {
+    console.error('Error loading codes:', err);
+  }
+}
+
+function renderPendingCodes(codes) {
+  const container = $('#pending-codes-list');
+  if (!codes || codes.length === 0) {
+    container.innerHTML = '<p class="empty-state">Nenhum código pendente.</p>';
+    return;
+  }
+
+  container.innerHTML = codes.map(c => `
+    <div class="code-card">
+      <div class="code-card-header">
+        <div>
+          <span class="code-value">${c.code}</span>
+          <span class="code-gold">G ${c.goldValue.toFixed(2)}</span>
+        </div>
+        <span class="status-badge status-pending">Pendente</span>
+      </div>
+      <div class="code-details">
+        <div>Cadastrado por: <strong>${c.createdByName || 'ADM'}</strong></div>
+        <div>Data: <strong>${c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString('pt-BR') + ' ' + new Date(c.createdAt.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></div>
+      </div>
+      <div class="code-actions">
+        <button class="btn btn-accent btn-sm" onclick="redeemCode('${c.id}')">🎯 Resgatar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCode('${c.id}', '${c.code}')">🗑️ Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderRedeemedCodes(codes) {
+  const container = $('#redeemed-codes-list');
+  if (!codes || codes.length === 0) {
+    container.innerHTML = '<p class="empty-state">Nenhum código resgatado ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = codes.map(c => `
+    <div class="code-card redeemed">
+      <div class="code-card-header">
+        <div>
+          <span class="code-value">${c.code}</span>
+          <span class="code-gold">G ${c.goldValue.toFixed(2)}</span>
+        </div>
+        <span class="status-badge status-active">Resgatado</span>
+      </div>
+      <div class="code-details">
+        <div>Cadastrado por: <strong>${c.createdByName || 'ADM'}</strong></div>
+        <div>Data cadastro: <strong>${c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString('pt-BR') + ' ' + new Date(c.createdAt.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></div>
+        <div>Resgatado por: <strong>${c.redeemedByName || 'ADM'}</strong></div>
+        <div>Data resgate: <strong>${c.redeemedAt ? new Date(c.redeemedAt.seconds * 1000).toLocaleDateString('pt-BR') + ' ' + new Date(c.redeemedAt.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}</strong></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.redeemCode = async function(codeId) {
+  if (!confirm('Deseja realmente resgatar este código?')) return;
+
+  try {
+    await updateDoc(doc(db, 'codes', codeId), {
+      status: 'redeemed',
+      redeemedAt: serverTimestamp(),
+      redeemedBy: state.currentUser.uid,
+      redeemedByName: state.userProfile.nome || state.userProfile.nick || 'ADM'
+    });
+
+    toast('Código resgatado com sucesso!', 'success');
+    loadCodes();
+  } catch (err) {
+    console.error('Error redeeming code:', err);
+    toast('Erro ao resgatar código.', 'error');
+  }
+};
+
+window.deleteCode = async function(codeId, codeValue) {
+  if (!confirm(`Deseja realmente excluir o código "${codeValue}"?`)) return;
+
+  try {
+    await deleteDoc(doc(db, 'codes', codeId));
+    toast('Código excluído com sucesso.', 'success');
+    loadCodes();
+  } catch (err) {
+    console.error('Error deleting code:', err);
+    toast('Erro ao excluir código.', 'error');
+  }
+};
+
+// ============================================
 // PROFILE EDIT (own data)
 // ============================================
 function openEditProfile() {
@@ -1466,6 +1621,7 @@ function bindEvents() {
   $('#form-edit-user').addEventListener('submit', handleEditUser);
   $('#form-delete-user').addEventListener('submit', handleDeleteUser);
   $('#form-edit-profile').addEventListener('submit', handleEditProfile);
+  $('#form-register-code').addEventListener('submit', handleRegisterCode);
 
   // Logout
   $('#btn-logout').addEventListener('click', handleLogout);
@@ -1478,6 +1634,7 @@ function bindEvents() {
       if (item.dataset.tab === 'aprovacoes') loadPendingUsers();
       if (item.dataset.tab === 'gerenciamento') loadUsersTable();
       if (item.dataset.tab === 'historico') loadRegistrationHistory();
+      if (item.dataset.tab === 'codigos') loadCodes();
     });
   });
 
@@ -1498,6 +1655,7 @@ function bindEvents() {
   $('#eprof-email').addEventListener('input', (e) => { /* email validation handled by type */ });
   $('#eprof-whatsapp').addEventListener('input', maskOnlyNumbers);
   $('#eprof-nascimento').addEventListener('input', maskOnlyNumbers);
+  $('#code-value').addEventListener('input', maskAlphaNum);
 
   // Draw controls
   $('#btn-girar-roleta').addEventListener('click', spinRoulette);
