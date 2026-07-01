@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel ADM - Clan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loading-screen">
+    <div class="loader-ring"></div>
+    <p class="loader-text">Carregando...</p>
+  </div>
+
+  <!-- ===== LOGIN SCREEN ===== -->
+  <div id="screen-login" class="screen hidden">
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="logo-icon">⚔</div>
+          <h1>PAINEL ADM</h1>
+          <p class="auth-subtitle">Acesso ao Sistema do Clan</p>
+        </div>
+        <form id="form-login" autocomplete="off">
+          <div class="form-group">
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" placeholder="seu@email.com" required>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Senha</label>
+            <input type="password" id="login-password" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">
+            <span class="btn-text">Entrar</span>
+            <span class="btn-loader hidden"></span>
+          </button>
+        </form>
+        <div class="auth-footer">
+          <p>Não tem conta? <a href="#" id="btn-go-register">Cadastre-se</a></p>
+        </div>
+        <div id="login-error" class="alert alert-error hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REGISTER SCREEN ===== -->
+  <div id="screen-register" class="screen hidden">
+    <div class="auth-container">
+      <div class="auth-card auth-card-wide">
+        <div class="auth-logo">
+          <div class="logo-icon">⚔</div>
+          <h1>CADASTRO</h1>
+          <p class="auth-subtitle">Preencha seus dados para ingressar no Clan</p>
+        </div>
+
+        <!-- Privacy Notice -->
+        <div class="privacy-notice">
+          <span class="privacy-icon">🔒</span>
+          <p>Seus dados são protegidos e não compartilhados com terceiros. Utilizamos criptografia para garantir a segurança das suas informações.</p>
+        </div>
+
+        <form id="form-register" autocomplete="off">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg-nome">Nome Verdadeiro <span class="req">*</span></label>
+              <input type="text" id="reg-nome" placeholder="Apenas letras" required pattern="[A-Za-zÀ-ÿ\s]+">
+              <span class="field-hint">Somente letras</span>
+            </div>
+            <div class="form-group">
+              <label for="reg-nick">Nickname <span class="req">*</span></label>
+              <input type="text" id="reg-nick" placeholder="Letras e números" required pattern="[A-Za-z0-9]+">
+              <span class="field-hint">Letras e números</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg-contaid">ID da Conta <span class="req">*</span></label>
+              <input type="text" id="reg-contaid" placeholder="Máx. 9 números" required maxlength="9" pattern="[0-9]{1,9}">
+              <span class="field-hint">Somente números (máx. 9)</span>
+            </div>
+            <div class="form-group">
+              <label for="reg-whatsapp">WhatsApp <span class="req">*</span></label>
+              <input type="text" id="reg-whatsapp" placeholder="Somente números" required pattern="[0-9]+">
+              <span class="field-hint">Somente números</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg-email">Email <span class="req">*</span></label>
+              <input type="email" id="reg-email" placeholder="seu@email.com" required>
+              <span class="field-hint">Usado para login</span>
+            </div>
+            <div class="form-group">
+              <label for="reg-senha">Senha <span class="req">*</span></label>
+              <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" required minlength="6">
+              <span class="field-hint">Usado para login</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="reg-nascimento">Data de Nascimento <span class="req">*</span></label>
+              <input type="text" id="reg-nascimento" placeholder="DDMMAAAA" required maxlength="8" pattern="[0-9]{8}">
+              <span class="field-hint">Somente números (DDMMAAAA)</span>
+            </div>
+            <div class="form-group">
+              <label>Gênero <span class="req">*</span></label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="reg-genero" value="masculino" required>
+                  <span class="radio-custom"></span> Masculino
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="reg-genero" value="feminino">
+                  <span class="radio-custom"></span> Feminino
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clan Rules -->
+          <div class="rules-section">
+            <h3>📜 Regras da Comunidade</h3>
+            <div class="rules-content">
+              <p><strong>🛡️ Respeito em primeiro lugar:</strong> Não serão toleradas ofensas, provocações, discriminação, preconceito, assédio ou qualquer comportamento tóxico contra outros membros.</p>
+              <p><strong>🚫 Conteúdo proibido:</strong> É proibido enviar, compartilhar ou divulgar conteúdo pornográfico, gore, material de abuso infantil (CP) ou qualquer outro conteúdo impróprio ou ilegal.</p>
+              <p><strong>📵 Chamadas de voz:</strong> Ligações no grupo geral não são permitidas. Utilize apenas os canais destinados às calls.</p>
+              <p><strong>⏳ Inatividade:</strong> Membros que permanecerem 7 dias sem atividade, tanto no competitivo quanto no casual, sem avisar previamente a administração, poderão ser rebaixados ou removidos da comunidade.</p>
+            </div>
+            <label class="checkbox-label">
+              <input type="checkbox" id="reg-aceitar-regras" required>
+              <span class="checkbox-custom"></span>
+              <span>Li e concordo com os termos e regras do Clan <span class="req">*</span></span>
+            </label>
+          </div>
+
+          <!-- Select Admin for WhatsApp -->
+          <div class="form-group">
+            <label for="reg-adm-destino">Enviar dados para (ADM) <span class="req">*</span></label>
+            <select id="reg-adm-destino" required>
+              <option value="">Selecione um ADM...</option>
+            </select>
+            <span class="field-hint">Seus dados serão enviados via WhatsApp para o ADM selecionado</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full">
+            <span class="btn-text">Cadastrar</span>
+            <span class="btn-loader hidden"></span>
+          </button>
+        </form>
+        <div class="auth-footer">
+          <p>Já tem conta? <a href="#" id="btn-go-login">Fazer login</a></p>
+        </div>
+        <div id="register-error" class="alert alert-error hidden"></div>
+        <div id="register-success" class="alert alert-success hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN APP (AFTER LOGIN) ===== -->
+  <div id="screen-app" class="screen hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon-sm">⚔</div>
+        <span class="sidebar-title">PAINEL ADM</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-tab="sorteio">
+          <span class="nav-icon">🎰</span>
+          <span class="nav-label">Sorteio</span>
+        </a>
+        <a href="#" class="nav-item admin-only hidden" data-tab="gerenciamento">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Gerenciamento</span>
+        </a>
+        <a href="#" class="nav-item admin-only hidden" data-tab="aprovacoes">
+          <span class="nav-icon">✅</span>
+          <span class="nav-label">Aprovações</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="configuracoes">
+          <span class="nav-icon">⚙</span>
+          <span class="nav-label">Configurações</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="user-avatar">U</div>
+          <div class="user-details">
+            <span class="user-name" id="user-display-name">Usuário</span>
+            <span class="user-role" id="user-display-role">Padrão</span>
+          </div>
+        </div>
+        <button id="btn-logout" class="btn-logout" title="Sair">🚪</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content">
+      <!-- TAB: Sorteio -->
+      <section id="tab-sorteio" class="tab-content active">
+        <div class="tab-header">
+          <h2>🎰 Sorteio</h2>
+          <div class="sorteio-info">
+            <span id="sorteio-data" class="info-badge"></span>
+            <span id="sorteio-hora" class="info-badge"></span>
+          </div>
+        </div>
+
+        <!-- Admin Controls for Draw -->
+        <div id="sorteio-admin-controls" class="card hidden">
+          <h3>Configurar Sorteio</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="draw-valor">Valor do Sorteio (Gold)</label>
+              <input type="number" id="draw-valor" placeholder="0 G" step="1" min="0">
+            </div>
+            <div class="form-group">
+              <label for="draw-adm-info">ADM Realizando</label>
+              <select id="draw-adm-info">
+                <option value="">Selecione um ADM...</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Selecionar Participantes</label>
+            <div class="participants-select">
+              <div class="select-actions">
+                <button type="button" class="btn btn-sm btn-outline" id="btn-select-all">Selecionar Todos</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btn-deselect-all">Limpar</button>
+              </div>
+              <div id="participants-list" class="participants-list"></div>
+            </div>
+          </div>
+          <div class="sorteio-actions">
+            <button id="btn-salvar-sorteio" class="btn btn-primary">💾 Salvar Configuração</button>
+            <button id="btn-girar-roleta" class="btn btn-accent">🎯 Girar Roleta</button>
+          </div>
+        </div>
+
+        <!-- Roulette Wheel -->
+        <div class="roulette-container">
+          <div class="roulette-wrapper">
+            <canvas id="roulette-canvas" width="400" height="400"></canvas>
+            <div class="roulette-pointer"></div>
+          </div>
+          <div id="roulette-result" class="roulette-result hidden">
+            <div class="result-content">
+              <span class="result-label">🏆 GANHADOR</span>
+              <span class="result-name" id="result-winner"></span>
+              <span class="result-value" id="result-value"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Draw History -->
+        <div class="card">
+          <h3>📋 Histórico de Sorteios</h3>
+          <div id="draw-history" class="history-list">
+            <p class="empty-state">Nenhum sorteio realizado ainda.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Gerenciamento (Admin Only) -->
+      <section id="tab-gerenciamento" class="tab-content hidden">
+        <div class="tab-header">
+          <h2>👥 Gerenciamento de Usuários</h2>
+          <div class="tab-actions">
+            <input type="text" id="search-users" placeholder="Buscar usuário..." class="search-input">
+          </div>
+        </div>
+        <div class="card">
+          <div id="users-table-wrapper">
+            <table class="data-table" id="users-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Nick</th>
+                  <th>ID Conta</th>
+                  <th>Email</th>
+                  <th>WhatsApp</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+          <p id="no-users-msg" class="empty-state hidden">Nenhum usuário cadastrado.</p>
+        </div>
+
+        <!-- Edit User Modal -->
+        <div id="modal-edit-user" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>Editar Usuário</h3>
+              <button class="modal-close" id="btn-close-edit">&times;</button>
+            </div>
+            <form id="form-edit-user">
+              <input type="hidden" id="edit-user-id">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="edit-nome">Nome</label>
+                  <input type="text" id="edit-nome" required pattern="[A-Za-zÀ-ÿ\s]+">
+                </div>
+                <div class="form-group">
+                  <label for="edit-nick">Nickname</label>
+                  <input type="text" id="edit-nick" required pattern="[A-Za-z0-9]+">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="edit-contaid">ID da Conta</label>
+                  <input type="text" id="edit-contaid" required maxlength="9" pattern="[0-9]{1,9}">
+                </div>
+                <div class="form-group">
+                  <label for="edit-whatsapp">WhatsApp</label>
+                  <input type="text" id="edit-whatsapp" required pattern="[0-9]+">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="edit-nascimento">Nascimento</label>
+                  <input type="text" id="edit-nascimento" required maxlength="8" pattern="[0-9]{8}">
+                </div>
+                <div class="form-group">
+                  <label for="edit-genero">Gênero</label>
+                  <select id="edit-genero" required>
+                    <option value="masculino">Masculino</option>
+                    <option value="feminino">Feminino</option>
+                  </select>
+                </div>
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-outline" id="btn-cancel-edit">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Delete User Modal -->
+        <div id="modal-delete-user" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content modal-sm">
+            <div class="modal-header">
+              <h3>Excluir Usuário</h3>
+              <button class="modal-close" id="btn-close-delete">&times;</button>
+            </div>
+            <form id="form-delete-user">
+              <input type="hidden" id="delete-user-id">
+              <p class="delete-user-name">Usuário: <strong id="delete-user-name-label"></strong></p>
+              <div class="form-group">
+                <label>Motivo da Exclusão <span class="req">*</span></label>
+                <select id="delete-reason" required>
+                  <option value="">Selecione o motivo...</option>
+                  <option value="preconceito">Preconceito</option>
+                  <option value="toxicidade">Toxicidade</option>
+                  <option value="nao_ativo">Não Ativo</option>
+                  <option value="pedido_saida">Pedido de Saída do Clan</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="delete-observacao">Observação</label>
+                <textarea id="delete-observacao" rows="3" placeholder="Informações adicionais..."></textarea>
+              </div>
+              <label class="checkbox-label">
+                <input type="checkbox" id="delete-block-data">
+                <span class="checkbox-custom"></span>
+                <span>Bloquear todos os dados (impedir novo cadastro)</span>
+              </label>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-outline" id="btn-cancel-delete">Cancelar</button>
+                <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Aprovações (Admin Only) -->
+      <section id="tab-aprovacoes" class="tab-content hidden">
+        <div class="tab-header">
+          <h2>✅ Aprovações de Cadastro</h2>
+        </div>
+        <div id="pending-list" class="card">
+          <p class="empty-state">Nenhum cadastro pendente de aprovação.</p>
+        </div>
+      </section>
+
+      <!-- TAB: Configurações -->
+      <section id="tab-configuracoes" class="tab-content hidden">
+        <div class="tab-header">
+          <h2>⚙ Configurações</h2>
+        </div>
+        <div class="card">
+          <h3>Meus Dados</h3>
+          <div id="profile-data" class="profile-grid">
+            <div class="profile-item">
+              <span class="profile-label">Nome</span>
+              <span class="profile-value" id="prof-nome">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">Nickname</span>
+              <span class="profile-value" id="prof-nick">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">ID da Conta</span>
+              <span class="profile-value" id="prof-contaid">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">Email</span>
+              <span class="profile-value" id="prof-email">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">WhatsApp</span>
+              <span class="profile-value" id="prof-whatsapp">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">Gênero</span>
+              <span class="profile-value" id="prof-genero">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">Nascimento</span>
+              <span class="profile-value" id="prof-nascimento">-</span>
+            </div>
+            <div class="profile-item">
+              <span class="profile-label">Status</span>
+              <span class="profile-value" id="prof-status">-</span>
+            </div>
+          </div>
+          <button id="btn-edit-profile" class="btn btn-primary" style="margin-top:1.5rem">✏️ Editar Dados</button>
+        </div>
+
+        <!-- Edit Profile Modal -->
+        <div id="modal-edit-profile" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>Editar Meus Dados</h3>
+              <button class="modal-close" id="btn-close-edit-profile">&times;</button>
+            </div>
+            <form id="form-edit-profile">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="eprof-nome">Nome</label>
+                  <input type="text" id="eprof-nome" required pattern="[A-Za-zÀ-ÿ\s]+">
+                </div>
+                <div class="form-group">
+                  <label for="eprof-nick">Nickname</label>
+                  <input type="text" id="eprof-nick" required pattern="[A-Za-z0-9]+">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="eprof-whatsapp">WhatsApp</label>
+                  <input type="text" id="eprof-whatsapp" required pattern="[0-9]+">
+                </div>
+                <div class="form-group">
+                  <label for="eprof-nascimento">Nascimento</label>
+                  <input type="text" id="eprof-nascimento" required maxlength="8" pattern="[0-9]{8}">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="eprof-genero">Gênero</label>
+                <select id="eprof-genero" required>
+                  <option value="masculino">Masculino</option>
+                  <option value="feminino">Feminino</option>
+                </select>
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-outline" id="btn-cancel-edit-profile">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Admin Settings (only for ADM) -->
+        <div id="admin-settings" class="card hidden">
+          <h3>Configurações de ADM</h3>
+          <div class="form-group">
+            <label for="admin-whatsapp-number">WhatsApp para recebimento de cadastros</label>
+            <div class="inline-form">
+              <input type="text" id="admin-whatsapp-number" placeholder="5511999999999" pattern="[0-9]+">
+              <button id="btn-save-admin-whatsapp" class="btn btn-primary btn-sm">Salvar</button>
+            </div>
+            <span class="field-hint">Número onde os dados de cadastro serão enviados via WhatsApp</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
