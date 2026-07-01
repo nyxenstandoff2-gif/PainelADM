@@ -278,6 +278,9 @@ function renderRegistrationHistory(history) {
     } else if (h.action === 'deleted') {
       actionClass = 'status-blocked';
       actionLabel = '⊘ Apagado';
+    } else if (h.action === 'reactivated') {
+      actionClass = 'status-active';
+      actionLabel = '↻ Reativado';
     }
     
     return `
@@ -802,7 +805,14 @@ async function loadUsersTable() {
       if (data.role !== 'admin') users.push({ id: d.id, ...data });
     });
     state.allUsers = users;
-    renderUsersTable(users);
+    
+    // Apply status filter
+    const statusFilter = $('#filter-user-status')?.value || 'all';
+    const filteredUsers = statusFilter === 'all' 
+      ? users 
+      : users.filter(u => u.status === statusFilter);
+    
+    renderUsersTable(filteredUsers);
   } catch (err) {
     console.error('Error loading users:', err);
   }
@@ -822,48 +832,126 @@ function renderUsersTable(users) {
   
   if (isMobile) {
     // Mobile: render as cards
-    tbody.innerHTML = users.map(u => `
-      <tr>
-        <td colspan="7">
-          <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <strong style="color: var(--text-primary);">${u.nick || u.nome}</strong>
-              <span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">
-                ${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}
-              </span>
+    tbody.innerHTML = users.map(u => {
+      const isBlocked = u.status === 'blocked';
+      const actions = isBlocked 
+        ? `<button class="action-btn" onclick="viewBlockedUser('${u.id}')" title="Ver Detalhes" style="flex: 1; justify-content: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c;">👁️</button>
+           <button class="action-btn" onclick="reactivateUser('${u.id}')" title="Reativar" style="flex: 1; justify-content: center; background: rgba(46, 204, 113, 0.1); color: #2ecc71;">✅</button>`
+        : `<button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar" style="flex: 1; justify-content: center;">✏️</button>
+           <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir" style="flex: 1; justify-content: center;">🗑️</button>`;
+      
+      return `
+        <tr>
+          <td colspan="7">
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: var(--text-primary);">${u.nick || u.nome}</strong>
+                <span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">
+                  ${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}
+                </span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                ${u.nome}<br>
+                ID: ${u.contaid || '-'} • ${u.whatsapp || '-'}
+              </div>
+              ${isBlocked && u.deleteReason ? `<div style="font-size: 0.75rem; color: #e74c3c; margin-top: 0.2rem;">Motivo: ${u.deleteReason}</div>` : ''}
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
+                ${actions}
+              </div>
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">
-              ${u.nome}<br>
-              ID: ${u.contaid || '-'} • ${u.whatsapp || '-'}
-            </div>
-            <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
-              <button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar" style="flex: 1; justify-content: center;">✏️</button>
-              <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir" style="flex: 1; justify-content: center;">🗑️</button>
-            </div>
-          </div>
-        </td>
-      </tr>
-    `).join('');
+          </td>
+        </tr>
+      `;
+    }).join('');
   } else {
     // Desktop: render as table
-    tbody.innerHTML = users.map(u => `
-      <tr>
-        <td>${u.nome || '-'}</td>
-        <td>${u.nick || '-'}</td>
-        <td>${u.contaid || '-'}</td>
-        <td>${u.email || '-'}</td>
-        <td>${u.whatsapp || '-'}</td>
-        <td><span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}</span></td>
-        <td>
-          <div class="action-btns">
-            <button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar">✏️</button>
-            <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir">🗑️</button>
-          </div>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = users.map(u => {
+      const isBlocked = u.status === 'blocked';
+      const actions = isBlocked
+        ? `<button class="action-btn" onclick="viewBlockedUser('${u.id}')" title="Ver Detalhes" style="background: rgba(231, 76, 60, 0.1); color: #e74c3c;">👁️</button>
+           <button class="action-btn" onclick="reactivateUser('${u.id}')" title="Reativar" style="background: rgba(46, 204, 113, 0.1); color: #2ecc71;">✅</button>`
+        : `<button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar">✏️</button>
+           <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir">🗑️</button>`;
+      
+      return `
+        <tr>
+          <td>${u.nome || '-'}</td>
+          <td>${u.nick || '-'}</td>
+          <td>${u.contaid || '-'}</td>
+          <td>${u.email || '-'}</td>
+          <td>${u.whatsapp || '-'}</td>
+          <td><span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}</span></td>
+          <td>
+            <div class="action-btns">
+              ${actions}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 }
+
+// View blocked user details
+window.viewBlockedUser = function(uid) {
+  const user = state.allUsers.find(u => u.id === uid);
+  if (!user) return;
+  
+  $('#blocked-name').textContent = user.nome || user.nick || '-';
+  
+  // Translate reason
+  const reasonMap = {
+    'preconceito': 'Preconceito',
+    'toxicidade': 'Toxicidade',
+    'nao_ativo': 'Não Ativo',
+    'pedido_saida': 'Pedido de Saída do Clan'
+  };
+  $('#blocked-reason').textContent = reasonMap[user.deleteReason] || user.deleteReason || 'Não informado';
+  $('#blocked-observation').textContent = user.deleteObservacao || 'Nenhuma observação';
+  
+  // Format date if available
+  if (user.deletedAt) {
+    const date = user.deletedAt.toDate ? user.deletedAt.toDate() : new Date(user.deletedAt);
+    $('#blocked-date').textContent = date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } else {
+    $('#blocked-date').textContent = 'Não informado';
+  }
+  
+  // Store user id for reactivation
+  $('#modal-view-blocked').dataset.userId = uid;
+  show($('#modal-view-blocked'));
+};
+
+// Reactivate user
+window.reactivateUser = async function(uid) {
+  if (!confirm('Deseja realmente reativar este usuário?')) return;
+  
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      status: 'active',
+      deleteReason: null,
+      deleteObservacao: null,
+      deletedAt: null,
+      reactivatedAt: serverTimestamp(),
+      reactivatedBy: state.currentUser.uid,
+      reactivatedByName: state.userProfile.nome || state.userProfile.nick || 'ADM'
+    });
+    
+    // Save to registration history
+    const user = state.allUsers.find(u => u.id === uid);
+    if (user) {
+      await saveRegistrationHistory('reactivated', user);
+    }
+    
+    toast('Usuário reativado com sucesso!', 'success');
+    hide($('#modal-view-blocked'));
+    loadUsersTable();
+    loadRegistrationHistory();
+  } catch (err) {
+    console.error('Error reactivating user:', err);
+    toast('Erro ao reativar usuário.', 'error');
+  }
+};
 
 window.openEditUser = function(uid) {
   const u = state.allUsers.find(x => x.id === uid);
@@ -1256,13 +1344,64 @@ function bindEvents() {
   if ($('#search-users')) {
     $('#search-users').addEventListener('input', (e) => {
       const term = e.target.value.toLowerCase();
-      const filtered = state.allUsers.filter(u =>
+      const statusFilter = $('#filter-user-status')?.value || 'all';
+      let filtered = state.allUsers;
+      
+      // Apply status filter first
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(u => u.status === statusFilter);
+      }
+      
+      // Then apply search filter
+      filtered = filtered.filter(u =>
         (u.nome || '').toLowerCase().includes(term) ||
         (u.nick || '').toLowerCase().includes(term) ||
         (u.email || '').toLowerCase().includes(term) ||
         (u.contaid || '').includes(term)
       );
       renderUsersTable(filtered);
+    });
+  }
+  
+  // Filter by status
+  if ($('#filter-user-status')) {
+    $('#filter-user-status').addEventListener('change', (e) => {
+      const statusFilter = e.target.value;
+      const searchTerm = ($('#search-users')?.value || '').toLowerCase();
+      let filtered = state.allUsers;
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(u => u.status === statusFilter);
+      }
+      
+      // Then apply search filter
+      if (searchTerm) {
+        filtered = filtered.filter(u =>
+          (u.nome || '').toLowerCase().includes(searchTerm) ||
+          (u.nick || '').toLowerCase().includes(searchTerm) ||
+          (u.email || '').toLowerCase().includes(searchTerm) ||
+          (u.contaid || '').includes(searchTerm)
+        );
+      }
+      
+      renderUsersTable(filtered);
+    });
+  }
+  
+  // Blocked user modal controls
+  if ($('#btn-close-view-blocked')) {
+    $('#btn-close-view-blocked').addEventListener('click', () => hide($('#modal-view-blocked')));
+  }
+  if ($('#btn-close-blocked-details')) {
+    $('#btn-close-blocked-details').addEventListener('click', () => hide($('#modal-view-blocked')));
+  }
+  if ($('#btn-reactivate-user')) {
+    $('#btn-reactivate-user').addEventListener('click', () => {
+      const uid = $('#modal-view-blocked').dataset.userId;
+      if (uid) {
+        reactivateUser(uid);
+      }
     });
   }
   

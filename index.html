@@ -337,6 +337,11 @@
         <div class="tab-header">
           <h2>👥 Gerenciamento de Usuários</h2>
           <div class="tab-actions">
+            <select id="filter-user-status" class="search-input" style="min-width: 150px;">
+              <option value="all">Todos os Status</option>
+              <option value="active">Ativos</option>
+              <option value="blocked">Bloqueados</option>
+            </select>
             <input type="text" id="search-users" placeholder="Buscar usuário..." class="search-input">
           </div>
         </div>
@@ -446,6 +451,39 @@
                 <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
               </div>
             </form>
+          </div>
+        </div>
+
+        <!-- View Blocked User Modal -->
+        <div id="modal-view-blocked" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content modal-sm">
+            <div class="modal-header">
+              <h3>Detalhes do Usuário Bloqueado</h3>
+              <button class="modal-close" id="btn-close-view-blocked">&times;</button>
+            </div>
+            <div class="blocked-details">
+              <div class="detail-row">
+                <span class="detail-label">Nome:</span>
+                <span class="detail-value" id="blocked-name">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Motivo:</span>
+                <span class="detail-value detail-reason" id="blocked-reason">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Observação:</span>
+                <span class="detail-value" id="blocked-observation">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Data:</span>
+                <span class="detail-value" id="blocked-date">-</span>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" id="btn-close-blocked-details">Fechar</button>
+              <button type="button" class="btn btn-accent" id="btn-reactivate-user">✅ Reativar Conta</button>
+            </div>
           </div>
         </div>
       </section>
@@ -581,6 +619,7 @@
               <option value="approved">Aprovados</option>
               <option value="rejected">Recusados</option>
               <option value="deleted">Apagados</option>
+              <option value="reactivated">Reativados</option>
             </select>
           </div>
         </div>
