@@ -38,7 +38,9 @@ const state = {
   currentTab: 'sorteio',
   selectedParticipants: new Set(),
   drawConfig: { valor: 0, participantes: [] },
-  rouletteSpinning: false
+  rouletteSpinning: false,
+  nextDraw: null,
+  countdownInterval: null
 };
 
 // === DOM Helpers ===
@@ -151,11 +153,13 @@ function updateUIForRole() {
     $$('.admin-only').forEach(el => show(el));
     show($('#sorteio-admin-controls'));
     show($('#admin-settings'));
+    show($('#admin-next-draw-controls'));
     loadDrawAdminsList();
   } else {
     $$('.admin-only').forEach(el => hide(el));
     hide($('#sorteio-admin-controls'));
     hide($('#admin-settings'));
+    hide($('#admin-next-draw-controls'));
   }
 
   // Fill profile
@@ -172,6 +176,7 @@ function updateUIForRole() {
   loadParticipantsList();
   loadDrawHistory();
   loadAdminsList();
+  loadNextDraw();
   switchTab('sorteio');
 }
 
@@ -608,6 +613,146 @@ function renderDrawHistory() {
 }
 
 // ============================================
+// NEXT DRAW COUNTDOWN
+// ============================================
+async function loadNextDraw() {
+  try {
+    const docRef = doc(db, 'settings', 'nextDraw');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      state.nextDraw = docSnap.data();
+      showNextDraw();
+      startCountdown();
+    } else {
+      state.nextDraw = null;
+      hide($('#next-draw-section'));
+      hide($('#admin-next-draw-controls'));
+    }
+  } catch (err) {
+    console.error('Error loading next draw:', err);
+    hide($('#next-draw-section'));
+  }
+}
+
+function showNextDraw() {
+  if (!state.nextDraw) {
+    hide($('#next-draw-section'));
+    return;
+  }
+  
+  const drawDate = state.nextDraw.date?.toDate() || new Date(state.nextDraw.date);
+  const valor = state.nextDraw.valor || 0;
+  
+  // Format date
+  const dateStr = drawDate.toLocaleDateString('pt-BR', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  $('#next-draw-date').textContent = dateStr;
+  $('#next-draw-value').textContent = `${valor} G`;
+  
+  show($('#next-draw-section'));
+}
+
+function startCountdown() {
+  // Clear existing interval
+  if (state.countdownInterval) {
+    clearInterval(state.countdownInterval);
+  }
+  
+  // Update immediately
+  updateCountdown();
+  
+  // Then update every second
+  state.countdownInterval = setInterval(updateCountdown, 1000);
+}
+
+function updateCountdown() {
+  if (!state.nextDraw) return;
+  
+  const drawDate = state.nextDraw.date?.toDate() || new Date(state.nextDraw.date);
+  const now = new Date();
+  const diff = drawDate - now;
+  
+  if (diff <= 0) {
+    // Time's up
+    $('#countdown-days').textContent = '00';
+    $('#countdown-hours').textContent = '00';
+    $('#countdown-minutes').textContent = '00';
+    $('#countdown-seconds').textContent = '00';
+    clearInterval(state.countdownInterval);
+    return;
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  
+  $('#countdown-days').textContent = String(days).padStart(2, '0');
+  $('#countdown-hours').textContent = String(hours).padStart(2, '0');
+  $('#countdown-minutes').textContent = String(minutes).padStart(2, '0');
+  $('#countdown-seconds').textContent = String(seconds).padStart(2, '0');
+}
+
+async function saveNextDraw() {
+  const dateInput = $('#next-draw-date-input').value;
+  const valor = parseFloat($('#next-draw-value-input').value) || 0;
+  
+  if (!dateInput) {
+    toast('Selecione a data e hora do sorteio.', 'error');
+    return;
+  }
+  
+  if (valor <= 0) {
+    toast('Informe o valor do prêmio.', 'error');
+    return;
+  }
+  
+  try {
+    const drawDate = new Date(dateInput);
+    await setDoc(doc(db, 'settings', 'nextDraw'), {
+      date: Timestamp.fromDate(drawDate),
+      valor: valor,
+      createdBy: state.currentUser.uid,
+      createdByName: state.userProfile.nome || state.userProfile.nick || 'ADM',
+      createdAt: serverTimestamp()
+    });
+    
+    toast('Próximo sorteio configurado com sucesso!', 'success');
+    
+    // Reload and show
+    await loadNextDraw();
+    
+    // Clear form
+    $('#next-draw-date-input').value = '';
+    $('#next-draw-value-input').value = '';
+  } catch (err) {
+    console.error('Error saving next draw:', err);
+    toast('Erro ao configurar próximo sorteio.', 'error');
+  }
+}
+
+async function cancelNextDraw() {
+  try {
+    await deleteDoc(doc(db, 'settings', 'nextDraw'));
+    state.nextDraw = null;
+    hide($('#next-draw-section'));
+    if (state.countdownInterval) {
+      clearInterval(state.countdownInterval);
+    }
+    toast('Próximo sorteio cancelado.', 'info');
+  } catch (err) {
+    console.error('Error canceling next draw:', err);
+    toast('Erro ao cancelar sorteio.', 'error');
+  }
+}
+
+// ============================================
 // USER MANAGEMENT (Admin)
 // ============================================
 async function loadUsersTable() {
@@ -634,22 +779,53 @@ function renderUsersTable(users) {
     return;
   }
   hide($('#no-users-msg'));
-  tbody.innerHTML = users.map(u => `
-    <tr>
-      <td>${u.nome || '-'}</td>
-      <td>${u.nick || '-'}</td>
-      <td>${u.contaid || '-'}</td>
-      <td>${u.email || '-'}</td>
-      <td>${u.whatsapp || '-'}</td>
-      <td><span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}</span></td>
-      <td>
-        <div class="action-btns">
-          <button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar">✏️</button>
-          <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir">🗑️</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+  
+  // Check if mobile
+  const isMobile = window.innerWidth <= 768;
+  
+  if (isMobile) {
+    // Mobile: render as cards
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td colspan="7">
+          <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong style="color: var(--text-primary);">${u.nick || u.nome}</strong>
+              <span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">
+                ${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}
+              </span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+              ${u.nome}<br>
+              ID: ${u.contaid || '-'} • ${u.whatsapp || '-'}
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
+              <button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar" style="flex: 1; justify-content: center;">✏️</button>
+              <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir" style="flex: 1; justify-content: center;">🗑️</button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } else {
+    // Desktop: render as table
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td>${u.nome || '-'}</td>
+        <td>${u.nick || '-'}</td>
+        <td>${u.contaid || '-'}</td>
+        <td>${u.email || '-'}</td>
+        <td>${u.whatsapp || '-'}</td>
+        <td><span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}</span></td>
+        <td>
+          <div class="action-btns">
+            <button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar">✏️</button>
+            <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
 }
 
 window.openEditUser = function(uid) {
@@ -965,6 +1141,14 @@ function bindEvents() {
     state.selectedParticipants.clear();
   });
 
+  // Next Draw controls
+  if ($('#btn-save-next-draw')) {
+    $('#btn-save-next-draw').addEventListener('click', saveNextDraw);
+  }
+  if ($('#btn-cancel-next-draw')) {
+    $('#btn-cancel-next-draw').addEventListener('click', cancelNextDraw);
+  }
+
   // Modals close
   $('#btn-close-edit').addEventListener('click', () => hide($('#modal-edit-user')));
   $('#btn-cancel-edit').addEventListener('click', () => hide($('#modal-edit-user')));
@@ -993,15 +1177,48 @@ function bindEvents() {
   });
 
   // Search users
-  $('#search-users').addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = state.allUsers.filter(u =>
-      (u.nome || '').toLowerCase().includes(term) ||
-      (u.nick || '').toLowerCase().includes(term) ||
-      (u.contaid || '').includes(term) ||
-      (u.email || '').toLowerCase().includes(term)
-    );
-    renderUsersTable(filtered);
+  if ($('#search-users')) {
+    $('#search-users').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      const filtered = state.allUsers.filter(u =>
+        (u.nome || '').toLowerCase().includes(term) ||
+        (u.nick || '').toLowerCase().includes(term) ||
+        (u.email || '').toLowerCase().includes(term) ||
+        (u.contaid || '').includes(term)
+      );
+      renderUsersTable(filtered);
+    });
+  }
+  
+  // Mobile menu
+  if ($('#mobile-menu-btn')) {
+    $('#mobile-menu-btn').addEventListener('click', () => {
+      const sidebar = $('#sidebar');
+      const overlay = $('#mobile-overlay');
+      sidebar.classList.toggle('open');
+      if (sidebar.classList.contains('open')) {
+        overlay.classList.remove('hidden');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    });
+  }
+  
+  if ($('#mobile-overlay')) {
+    $('#mobile-overlay').addEventListener('click', () => {
+      $('#sidebar').classList.remove('open');
+      $('#mobile-overlay').classList.add('hidden');
+    });
+  }
+  
+  // Close mobile menu when clicking nav items
+  $$('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      if (window.innerWidth <= 768) {
+        $('#sidebar').classList.remove('open');
+        $('#mobile-overlay').classList.add('hidden');
+      }
+    });
   });
 }
 

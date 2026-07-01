@@ -6,7 +6,7 @@
   <title>Painel ADM - Clan</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=4">
+  <link rel="stylesheet" href="css/styles.css?v=6">
 </head>
 <body>
 
@@ -162,6 +162,11 @@
 
   <!-- ===== MAIN APP (AFTER LOGIN) ===== -->
   <div id="screen-app" class="screen hidden">
+    <!-- Mobile Menu Button -->
+    <button id="mobile-menu-btn" class="mobile-menu-btn">☰</button>
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" class="mobile-overlay hidden"></div>
+    
     <!-- Sidebar -->
     <aside id="sidebar">
       <div class="sidebar-header">
@@ -211,6 +216,64 @@
           <div class="sorteio-info">
             <span id="sorteio-data" class="info-badge"></span>
             <span id="sorteio-hora" class="info-badge"></span>
+          </div>
+        </div>
+
+        <!-- Próximo Sorteio - Countdown -->
+        <div id="next-draw-section" class="next-draw-card hidden">
+          <div class="next-draw-header">
+            <span class="next-draw-icon">⏰</span>
+            <h3>Próximo Sorteio</h3>
+          </div>
+          <div class="next-draw-info">
+            <div class="next-draw-value">
+              <span class="value-label">Prêmio:</span>
+              <span class="value-amount" id="next-draw-value">-</span>
+            </div>
+            <div class="next-draw-countdown">
+              <div class="countdown-item">
+                <span class="countdown-value" id="countdown-days">00</span>
+                <span class="countdown-label">Dias</span>
+              </div>
+              <span class="countdown-separator">:</span>
+              <div class="countdown-item">
+                <span class="countdown-value" id="countdown-hours">00</span>
+                <span class="countdown-label">Horas</span>
+              </div>
+              <span class="countdown-separator">:</span>
+              <div class="countdown-item">
+                <span class="countdown-value" id="countdown-minutes">00</span>
+                <span class="countdown-label">Min</span>
+              </div>
+              <span class="countdown-separator">:</span>
+              <div class="countdown-item">
+                <span class="countdown-value" id="countdown-seconds">00</span>
+                <span class="countdown-label">Seg</span>
+              </div>
+            </div>
+          </div>
+          <div class="next-draw-date">
+            <span class="date-label">Data:</span>
+            <span id="next-draw-date">-</span>
+          </div>
+        </div>
+
+        <!-- Admin: Configurar Próximo Sorteio -->
+        <div id="admin-next-draw-controls" class="card hidden">
+          <h3>Configurar Próximo Sorteio</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="next-draw-date-input">Data e Hora</label>
+              <input type="datetime-local" id="next-draw-date-input">
+            </div>
+            <div class="form-group">
+              <label for="next-draw-value-input">Valor do Prêmio (Gold)</label>
+              <input type="number" id="next-draw-value-input" placeholder="0 G" step="1" min="0">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button id="btn-save-next-draw" class="btn btn-primary">💾 Salvar Próximo Sorteio</button>
+            <button id="btn-cancel-next-draw" class="btn btn-outline">❌ Cancelar</button>
           </div>
         </div>
 
