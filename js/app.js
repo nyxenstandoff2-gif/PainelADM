@@ -664,7 +664,6 @@ async function loadNextDraw() {
     } else {
       state.nextDraw = null;
       hide($('#next-draw-section'));
-      hide($('#admin-next-draw-controls'));
     }
   } catch (err) {
     console.error('Error loading next draw:', err);
