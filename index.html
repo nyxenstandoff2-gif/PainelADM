@@ -6,7 +6,7 @@
   <title>Painel ADM - Clan</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=7">
 </head>
 <body>
 
@@ -562,9 +562,12 @@
         <!-- Admin Settings -->
         <div id="admin-settings" class="card hidden">
           <h3>Configurações de ADM</h3>
-          <p style="color: var(--text-secondary); font-size: 0.9rem;">
-            O número de WhatsApp cadastrado nesta conta será usado automaticamente para receber novos cadastros via WhatsApp.
-          </p>
+          <div class="form-group">
+            <label for="group-link">Link do Grupo (WhatsApp ou Discord)</label>
+            <input type="url" id="group-link" placeholder="https://chat.whatsapp.com/... ou https://discord.gg/...">
+            <span class="field-hint">Este link será enviado aos usuários quando forem aprovados</span>
+          </div>
+          <button id="btn-save-group-link" class="btn btn-primary">💾 Salvar Link do Grupo</button>
         </div>
       </section>
 

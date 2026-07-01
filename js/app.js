@@ -40,7 +40,8 @@ const state = {
   drawConfig: { valor: 0, participantes: [] },
   rouletteSpinning: false,
   nextDraw: null,
-  countdownInterval: null
+  countdownInterval: null,
+  settings: { groupLink: '' }
 };
 
 // === DOM Helpers ===
@@ -131,6 +132,10 @@ async function loadUserProfile(uid) {
     state.userProfile = { id: uid, ...userDoc.data() };
     state.isAdmin = state.userProfile.role === 'admin';
     updateUIForRole();
+    // Load settings if admin
+    if (state.isAdmin) {
+      loadSettings();
+    }
   } else {
     // Check if there's a pending registration for this email
     const q = query(collection(db, 'pendingUsers'), where('uid', '==', uid));
@@ -139,6 +144,39 @@ async function loadUserProfile(uid) {
       state.userProfile = { id: uid, ...snap.docs[0].data() };
       state.userProfile._pending = true;
     }
+  }
+}
+
+async function loadSettings() {
+  try {
+    const settingsDoc = await getDoc(doc(db, 'settings', 'clan'));
+    if (settingsDoc.exists()) {
+      state.settings = settingsDoc.data();
+      // Populate group link field if admin
+      if (state.isAdmin) {
+        const groupLinkInput = document.getElementById('group-link');
+        if (groupLinkInput && state.settings.groupLink) {
+          groupLinkInput.value = state.settings.groupLink;
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error loading settings:', err);
+  }
+}
+
+async function saveSettings(updates) {
+  try {
+    await setDoc(doc(db, 'settings', 'clan'), {
+      ...state.settings,
+      ...updates,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    state.settings = { ...state.settings, ...updates };
+    return true;
+  } catch (err) {
+    console.error('Error saving settings:', err);
+    return false;
   }
 }
 
@@ -977,11 +1015,33 @@ window.approvePending = async function(pendingId, uid) {
 
     // Remove pending
     await deleteDoc(doc(db, 'pendingUsers', pendingId));
-    toast('Usuário aprovado com sucesso!', 'success');
+    
+    // Send WhatsApp message with approval and group link
+    const groupLink = state.settings?.groupLink || '';
+    const userWhats = data.whatsapp || '';
+    
+    if (userWhats) {
+      let message = `Olá ${data.nome || data.nick}!\n\n✅ Seu cadastro foi APROVADO!\n\nBem-vindo ao clan! `;
+      
+      if (groupLink) {
+        message += `\n\n🔗 Acesse nosso grupo: ${groupLink}`;
+      }
+      
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${userWhats}?text=${encodedMessage}`;
+      
+      // Open WhatsApp in new tab
+      window.open(whatsappUrl, '_blank');
+      toast('Abrindo WhatsApp para enviar mensagem de aprovação...', 'info');
+    } else {
+      toast('Usuário aprovado com sucesso! (WhatsApp não cadastrado)', 'success');
+    }
+    
     loadPendingUsers();
     loadParticipantsList();
     loadRegistrationHistory();
   } catch (err) {
+    console.error('Error approving user:', err);
     toast('Erro ao aprovar usuário.', 'error');
   }
 };
@@ -1147,6 +1207,23 @@ function bindEvents() {
   }
   if ($('#btn-cancel-next-draw')) {
     $('#btn-cancel-next-draw').addEventListener('click', cancelNextDraw);
+  }
+
+  // Group Link control
+  if ($('#btn-save-group-link')) {
+    $('#btn-save-group-link').addEventListener('click', async () => {
+      const groupLink = $('#group-link').value.trim();
+      if (!groupLink) {
+        toast('Por favor, insira um link válido.', 'error');
+        return;
+      }
+      const success = await saveSettings({ groupLink });
+      if (success) {
+        toast('Link do grupo salvo com sucesso!', 'success');
+      } else {
+        toast('Erro ao salvar link do grupo.', 'error');
+      }
+    });
   }
 
   // Modals close
