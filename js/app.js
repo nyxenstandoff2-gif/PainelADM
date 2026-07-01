@@ -32,7 +32,12 @@ const MASTER_EMAIL = 'santosmattheuss@gmail.com';
 
 // Verifica se o usuário logado é o ADM Master
 function isMasterAdmin() {
-  return state.userProfile?.email === MASTER_EMAIL;
+  const profileEmail = (state.userProfile?.email || '').trim().toLowerCase();
+  const authEmail = (state.currentUser?.email || '').trim().toLowerCase();
+  const masterLower = MASTER_EMAIL.toLowerCase();
+  const isMaster = profileEmail === masterLower || authEmail === masterLower;
+  console.log('[MasterAdmin] profile email:', profileEmail, '| auth email:', authEmail, '| isMaster:', isMaster);
+  return isMaster;
 }
 
 // === State ===
@@ -194,7 +199,13 @@ function updateUIForRole() {
   const p = state.userProfile;
   if (!p) return;
   $('#user-display-name').textContent = p.nick || p.nome || 'Usuário';
-  $('#user-display-role').textContent = state.isAdmin ? 'ADMINISTRADOR' : 'USUÁRIO';
+  if (isMasterAdmin()) {
+    $('#user-display-role').textContent = 'ADM MASTER';
+  } else if (state.isAdmin) {
+    $('#user-display-role').textContent = 'ADMINISTRADOR';
+  } else {
+    $('#user-display-role').textContent = 'USUÁRIO';
+  }
   $('#user-avatar').textContent = (p.nick || p.nome || 'U').charAt(0).toUpperCase();
 
   if (state.isAdmin) {
@@ -865,8 +876,9 @@ async function loadUsersTable() {
     const users = [];
     snap.forEach(d => {
       const data = d.data();
-      // Excluir o ADM Master da lista de usuários
-      if (data.email === MASTER_EMAIL) return;
+      // Excluir o ADM Master da lista de usuários (comparação case-insensitive)
+      const userEmail = (data.email || '').trim().toLowerCase();
+      if (userEmail === MASTER_EMAIL.toLowerCase()) return;
       users.push({ id: d.id, ...data });
     });
     state.allUsers = users;
@@ -895,6 +907,7 @@ function renderUsersTable(users) {
   // Check if mobile
   const isMobile = window.innerWidth <= 768;
   const canManageRoles = isMasterAdmin();
+  console.log('[renderUsersTable] canManageRoles:', canManageRoles, '| users count:', users.length, '| isMasterAdmin:', isMasterAdmin());
   
   // Helper para badge de cargo
   const getRoleBadge = (u) => {
@@ -909,9 +922,11 @@ function renderUsersTable(users) {
     if (!canManageRoles) return ''; // ADMs comuns não podem alterar cargos
     if (u.status === 'blocked') return ''; // Não alterar cargo de bloqueados
     
-    const actionText = u.role === 'admin' ? '↓ Rebaixar' : '↑ Promover';
-    const actionClass = u.role === 'admin' ? 'role-btn-demote' : 'role-btn-promote';
-    return `<button class="action-btn ${actionClass}" onclick="openChangeRole('${u.id}')" title="${actionText}">${u.role === 'admin' ? '↓' : '↑'}</button>`;
+    const isPromote = u.role !== 'admin';
+    const actionText = isPromote ? '↑ Promover a ADM' : '↓ Rebaixar a Usuário';
+    const actionClass = isPromote ? 'role-btn-promote' : 'role-btn-demote';
+    const icon = isPromote ? '↑' : '↓';
+    return `<button class="action-btn role-change-btn ${actionClass}" onclick="openChangeRole('${u.id}')" title="${actionText}">${icon} ${isPromote ? 'Promover' : 'Rebaixar'}</button>`;
   };
   
   if (isMobile) {
