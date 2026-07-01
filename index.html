@@ -355,6 +355,7 @@
                   <th>ID Conta</th>
                   <th>Email</th>
                   <th>WhatsApp</th>
+                  <th>Cargo</th>
                   <th>Status</th>
                   <th>Ações</th>
                 </tr>
@@ -363,6 +364,34 @@
             </table>
           </div>
           <p id="no-users-msg" class="empty-state hidden">Nenhum usuário cadastrado.</p>
+        </div>
+
+        <!-- Change User Role Modal -->
+        <div id="modal-change-role" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content modal-sm">
+            <div class="modal-header">
+              <h3>Alterar Cargo do Usuário</h3>
+              <button class="modal-close" id="btn-close-change-role">&times;</button>
+            </div>
+            <div class="role-change-info">
+              <p>Usuário: <strong id="role-change-user-name">-</strong></p>
+              <p>Email: <strong id="role-change-user-email">-</strong></p>
+              <p>Cargo atual: <span class="role-badge" id="role-change-current">-</span></p>
+            </div>
+            <div class="form-group">
+              <label for="role-change-select">Novo Cargo</label>
+              <select id="role-change-select">
+                <option value="user">Usuário Comum</option>
+                <option value="admin">Administrador (ADM)</option>
+              </select>
+              <span class="field-hint" id="role-change-warning"></span>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" id="btn-cancel-change-role">Cancelar</button>
+              <button type="button" class="btn btn-primary" id="btn-confirm-change-role">Confirmar Alteração</button>
+            </div>
+          </div>
         </div>
 
         <!-- Edit User Modal -->
@@ -495,6 +524,68 @@
         </div>
         <div id="pending-list" class="card">
           <p class="empty-state">Nenhum cadastro pendente de aprovação.</p>
+        </div>
+
+        <!-- View Pending User Details Modal -->
+        <div id="modal-view-pending" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>Detalhes do Cadastro Pendente</h3>
+              <button class="modal-close" id="btn-close-view-pending">&times;</button>
+            </div>
+            <div class="pending-full-details">
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Nome Verdadeiro</span>
+                <span class="pending-detail-value" id="pending-view-nome">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Nickname</span>
+                <span class="pending-detail-value" id="pending-view-nick">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">ID da Conta</span>
+                <span class="pending-detail-value" id="pending-view-contaid">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Email</span>
+                <span class="pending-detail-value" id="pending-view-email">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">WhatsApp</span>
+                <span class="pending-detail-value" id="pending-view-whatsapp">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Data de Nascimento</span>
+                <span class="pending-detail-value" id="pending-view-nascimento">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Gênero</span>
+                <span class="pending-detail-value" id="pending-view-genero">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">ADM Destino</span>
+                <span class="pending-detail-value" id="pending-view-adm">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">WhatsApp do ADM</span>
+                <span class="pending-detail-value" id="pending-view-adm-whatsapp">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Data do Cadastro</span>
+                <span class="pending-detail-value" id="pending-view-date">-</span>
+              </div>
+              <div class="pending-detail-row">
+                <span class="pending-detail-label">Status</span>
+                <span class="pending-detail-value"><span class="status-badge status-pending">Pendente</span></span>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" id="btn-close-pending-details">Fechar</button>
+              <button type="button" class="btn btn-danger" id="btn-reject-from-modal">❌ Rejeitar</button>
+              <button type="button" class="btn btn-accent" id="btn-approve-from-modal">✅ Aprovar</button>
+            </div>
+          </div>
         </div>
       </section>
 

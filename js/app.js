@@ -25,6 +25,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// === Master Admin Config ===
+// O ADM Master é o único que pode promover/rebaixar outros ADMs
+// Ele não aparece na lista de usuários comuns
+const MASTER_EMAIL = 'santosmattheuss@gmail.com';
+
+// Verifica se o usuário logado é o ADM Master
+function isMasterAdmin() {
+  return state.userProfile?.email === MASTER_EMAIL;
+}
+
 // === State ===
 const state = {
   currentUser: null,
@@ -449,17 +459,56 @@ async function loadParticipantsList() {
     state.allUsers = [];
     const list = $('#participants-list');
     list.innerHTML = '';
+    
+    // Carregar o último vencedor do histórico
+    let lastWinnerId = null;
+    const drawHistoryQ = query(collection(db, 'drawHistory'));
+    const drawHistorySnap = await getDocs(drawHistoryQ);
+    const drawHistory = [];
+    drawHistorySnap.forEach(d => drawHistory.push({ id: d.id, ...d.data() }));
+    drawHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    if (drawHistory.length > 0) {
+      lastWinnerId = drawHistory[0].winnerId;
+    }
+    
     snap.forEach(d => {
       const u = d.data();
       if (u.role === 'admin') return;
       state.allUsers.push({ id: d.id, ...u });
+      
+      const isLastWinner = d.id === lastWinnerId;
+      
+      // Se é o último vencedor, não adicionar à lista de participantes
+      if (isLastWinner) {
+        // Mostrar como bloqueado
+        const item = document.createElement('div');
+        item.className = 'participant-item participant-blocked';
+        item.innerHTML = `
+          <input type="checkbox" disabled style="cursor: not-allowed; opacity: 0.3;">
+          <span style="opacity: 0.5; text-decoration: line-through;">${u.nick || u.nome} <small style="color:var(--text-muted)">(ID: ${u.contaid || '-'})</small></span>
+          <span class="winner-badge">Vencedor anterior - bloqueado</span>
+        `;
+        list.appendChild(item);
+        return; // Não adicionar ao state.allUsers para participação
+      }
+      
       const item = document.createElement('label');
       item.className = 'participant-item';
-      item.innerHTML = `<input type="checkbox" value="${d.id}" data-nick="${u.nick || u.nome}"> <span>${u.nick || u.nome} <small style="color:var(--text-muted)">(ID: ${u.contaid || '-'})</small></span>`;
-      item.querySelector('input').addEventListener('change', (e) => {
+      item.innerHTML = `
+        <input type="checkbox" value="${d.id}" data-nick="${u.nick || u.nome}" checked>
+        <span>${u.nick || u.nome} <small style="color:var(--text-muted)">(ID: ${u.contaid || '-'})</small></span>
+      `;
+      
+      const checkbox = item.querySelector('input');
+      checkbox.addEventListener('change', (e) => {
         if (e.target.checked) state.selectedParticipants.add(d.id);
         else state.selectedParticipants.delete(d.id);
       });
+      
+      // Adicionar aos selecionados por padrão
+      state.selectedParticipants.add(d.id);
+      
       list.appendChild(item);
     });
     // Also load for user management table
@@ -528,14 +577,22 @@ function drawWheel(ctx, canvas, names, rotation) {
     ctx.restore();
   });
 
-  // Center circle
+  // Center circle with percentage
+  const percentage = (100 / names.length).toFixed(1);
   ctx.beginPath();
-  ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 30, 0, Math.PI * 2);
   ctx.fillStyle = '#0a0e1a';
   ctx.fill();
   ctx.strokeStyle = '#f0b429';
   ctx.lineWidth = 2;
   ctx.stroke();
+  
+  // Percentage text
+  ctx.fillStyle = '#f0b429';
+  ctx.font = 'bold 14px Rajdhani';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${percentage}%`, cx, cy);
 }
 
 function spinRoulette() {
@@ -808,7 +865,9 @@ async function loadUsersTable() {
     const users = [];
     snap.forEach(d => {
       const data = d.data();
-      if (data.role !== 'admin') users.push({ id: d.id, ...data });
+      // Excluir o ADM Master da lista de usuários
+      if (data.email === MASTER_EMAIL) return;
+      users.push({ id: d.id, ...data });
     });
     state.allUsers = users;
     
@@ -835,26 +894,50 @@ function renderUsersTable(users) {
   
   // Check if mobile
   const isMobile = window.innerWidth <= 768;
+  const canManageRoles = isMasterAdmin();
+  
+  // Helper para badge de cargo
+  const getRoleBadge = (u) => {
+    if (u.role === 'admin') {
+      return '<span class="role-badge role-admin">ADM</span>';
+    }
+    return '<span class="role-badge role-user">Usuário</span>';
+  };
+  
+  // Helper para botão de alteração de cargo
+  const getRoleActionButton = (u) => {
+    if (!canManageRoles) return ''; // ADMs comuns não podem alterar cargos
+    if (u.status === 'blocked') return ''; // Não alterar cargo de bloqueados
+    
+    const actionText = u.role === 'admin' ? '↓ Rebaixar' : '↑ Promover';
+    const actionClass = u.role === 'admin' ? 'role-btn-demote' : 'role-btn-promote';
+    return `<button class="action-btn ${actionClass}" onclick="openChangeRole('${u.id}')" title="${actionText}">${u.role === 'admin' ? '↓' : '↑'}</button>`;
+  };
   
   if (isMobile) {
     // Mobile: render as cards
     tbody.innerHTML = users.map(u => {
       const isBlocked = u.status === 'blocked';
-      const actions = isBlocked 
+      const baseActions = isBlocked 
         ? `<button class="action-btn" onclick="viewBlockedUser('${u.id}')" title="Ver Detalhes" style="flex: 1; justify-content: center; background: rgba(231, 76, 60, 0.1); color: #e74c3c;">👁️</button>
            <button class="action-btn" onclick="reactivateUser('${u.id}')" title="Reativar" style="flex: 1; justify-content: center; background: rgba(46, 204, 113, 0.1); color: #2ecc71;">✅</button>`
         : `<button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar" style="flex: 1; justify-content: center;">✏️</button>
            <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir" style="flex: 1; justify-content: center;">🗑️</button>`;
       
+      const roleAction = getRoleActionButton(u);
+      
       return `
         <tr>
-          <td colspan="7">
+          <td colspan="8">
             <div style="display: flex; flex-direction: column; gap: 0.4rem;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <strong style="color: var(--text-primary);">${u.nick || u.nome}</strong>
-                <span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">
-                  ${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}
-                </span>
+                <div style="display: flex; gap: 0.4rem; align-items: center;">
+                  ${getRoleBadge(u)}
+                  <span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">
+                    ${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}
+                  </span>
+                </div>
               </div>
               <div style="font-size: 0.8rem; color: var(--text-secondary);">
                 ${u.nome}<br>
@@ -862,7 +945,8 @@ function renderUsersTable(users) {
               </div>
               ${isBlocked && u.deleteReason ? `<div style="font-size: 0.75rem; color: #e74c3c; margin-top: 0.2rem;">Motivo: ${u.deleteReason}</div>` : ''}
               <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
-                ${actions}
+                ${baseActions}
+                ${roleAction}
               </div>
             </div>
           </td>
@@ -873,11 +957,13 @@ function renderUsersTable(users) {
     // Desktop: render as table
     tbody.innerHTML = users.map(u => {
       const isBlocked = u.status === 'blocked';
-      const actions = isBlocked
+      const baseActions = isBlocked
         ? `<button class="action-btn" onclick="viewBlockedUser('${u.id}')" title="Ver Detalhes" style="background: rgba(231, 76, 60, 0.1); color: #e74c3c;">👁️</button>
            <button class="action-btn" onclick="reactivateUser('${u.id}')" title="Reativar" style="background: rgba(46, 204, 113, 0.1); color: #2ecc71;">✅</button>`
         : `<button class="action-btn" onclick="openEditUser('${u.id}')" title="Editar">✏️</button>
            <button class="action-btn delete" onclick="openDeleteUser('${u.id}')" title="Excluir">🗑️</button>`;
+      
+      const roleAction = getRoleActionButton(u);
       
       return `
         <tr>
@@ -886,10 +972,12 @@ function renderUsersTable(users) {
           <td>${u.contaid || '-'}</td>
           <td>${u.email || '-'}</td>
           <td>${u.whatsapp || '-'}</td>
+          <td>${getRoleBadge(u)}</td>
           <td><span class="status-badge status-${u.status === 'active' ? 'active' : u.status === 'blocked' ? 'blocked' : 'pending'}">${u.status === 'active' ? 'Ativo' : u.status === 'blocked' ? 'Bloqueado' : 'Pendente'}</span></td>
           <td>
             <div class="action-btns">
-              ${actions}
+              ${baseActions}
+              ${roleAction}
             </div>
           </td>
         </tr>
@@ -956,6 +1044,96 @@ window.reactivateUser = async function(uid) {
   } catch (err) {
     console.error('Error reactivating user:', err);
     toast('Erro ao reativar usuário.', 'error');
+  }
+};
+
+// ============================================
+// CHANGE USER ROLE (ADM Master only)
+// ============================================
+window.openChangeRole = function(uid) {
+  // Só ADM Master pode alterar cargos
+  if (!isMasterAdmin()) {
+    toast('Apenas o ADM Master pode alterar cargos.', 'error');
+    return;
+  }
+  
+  const u = state.allUsers.find(x => x.id === uid);
+  if (!u) return;
+  
+  // Não permitir alterar o próprio cargo
+  if (uid === state.currentUser.uid) {
+    toast('Você não pode alterar seu próprio cargo.', 'error');
+    return;
+  }
+  
+  const modal = $('#modal-change-role');
+  modal.dataset.userId = uid;
+  
+  $('#role-change-user-name').textContent = u.nome || u.nick || '-';
+  $('#role-change-user-email').textContent = u.email || '-';
+  
+  // Mostrar cargo atual
+  const currentBadge = $('#role-change-current');
+  if (u.role === 'admin') {
+    currentBadge.textContent = 'Administrador (ADM)';
+    currentBadge.className = 'role-badge role-admin';
+  } else {
+    currentBadge.textContent = 'Usuário Comum';
+    currentBadge.className = 'role-badge role-user';
+  }
+  
+  // Selecionar cargo atual no dropdown
+  const select = $('#role-change-select');
+  select.value = u.role || 'user';
+  
+  // Mostrar aviso
+  const warning = $('#role-change-warning');
+  if (u.role === 'admin') {
+    warning.textContent = '⚠️ Ao rebaixar, o usuário perderá acesso ao painel administrativo.';
+    warning.style.color = 'var(--accent-red)';
+  } else {
+    warning.textContent = 'O usuário terá acesso ao painel administrativo com permissões de ADM.';
+    warning.style.color = 'var(--accent-green)';
+  }
+  
+  show(modal);
+};
+
+window.saveUserRole = async function() {
+  if (!isMasterAdmin()) {
+    toast('Apenas o ADM Master pode alterar cargos.', 'error');
+    return;
+  }
+  
+  const uid = $('#modal-change-role').dataset.userId;
+  const newRole = $('#role-change-select').value;
+  const u = state.allUsers.find(x => x.id === uid);
+  
+  if (!u) return;
+  
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      role: newRole,
+      roleUpdatedAt: serverTimestamp(),
+      roleUpdatedBy: state.currentUser.uid,
+      roleUpdatedByName: state.userProfile.nome || state.userProfile.nick || 'ADM Master'
+    });
+    
+    hide($('#modal-change-role'));
+    
+    if (newRole === 'admin') {
+      toast(`${u.nick || u.nome} foi promovido a ADM com sucesso!`, 'success');
+    } else {
+      toast(`${u.nick || u.nome} foi rebaixado para Usuário Comum.`, 'success');
+    }
+    
+    // Recarregar lista de usuários e ADMs
+    loadUsersTable();
+    loadAdminsList();
+    loadParticipantsList();
+  } catch (err) {
+    console.error('Error changing user role:', err);
+    toast('Erro ao alterar cargo do usuário.', 'error');
   }
 };
 
@@ -1077,16 +1255,49 @@ function renderPendingUsers() {
         <div class="pending-detail"><span>ID Conta: </span>${p.contaid || '-'}</div>
         <div class="pending-detail"><span>Email: </span>${p.email || '-'}</div>
         <div class="pending-detail"><span>WhatsApp: </span>${p.whatsapp || '-'}</div>
-        <div class="pending-detail"><span>Gênero: </span>${p.genero || '-'}</div>
-        <div class="pending-detail"><span>Nascimento: </span>${formatBirth(p.nascimento)}</div>
       </div>
       <div class="pending-card-actions">
+        <button class="btn btn-outline btn-sm" onclick="viewPendingDetails('${p.id}')">👁️ Ver Detalhes</button>
         <button class="btn btn-danger btn-sm" onclick="rejectPending('${p.id}', '${p.uid || ''}')">❌ Rejeitar</button>
         <button class="btn btn-accent btn-sm" onclick="approvePending('${p.id}', '${p.uid || ''}')">✅ Aprovar</button>
       </div>
     </div>
   `).join('');
 }
+
+// View full details of pending user in modal
+window.viewPendingDetails = function(pendingId) {
+  const p = state.pendingUsers.find(x => x.id === pendingId);
+  if (!p) return;
+  
+  $('#pending-view-nome').textContent = p.nome || '-';
+  $('#pending-view-nick').textContent = p.nick || '-';
+  $('#pending-view-contaid').textContent = p.contaid || '-';
+  $('#pending-view-email').textContent = p.email || '-';
+  $('#pending-view-whatsapp').textContent = p.whatsapp || '-';
+  $('#pending-view-nascimento').textContent = p.nascimento ? formatBirth(p.nascimento) : '-';
+  $('#pending-view-genero').textContent = p.genero || '-';
+  
+  // Show ADM destination
+  const admUser = state.admins.find(a => a.id === p.admDestino);
+  $('#pending-view-adm').textContent = admUser ? (admUser.nick || admUser.nome) : (p.admDestino || '-');
+  $('#pending-view-adm-whatsapp').textContent = p.admWhatsapp || '-';
+  
+  // Show registration date
+  if (p.createdAt) {
+    const date = p.createdAt.toDate ? p.createdAt.toDate() : new Date(p.createdAt);
+    $('#pending-view-date').textContent = date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } else {
+    $('#pending-view-date').textContent = 'Não informado';
+  }
+  
+  // Store pending id and uid for approve/reject from modal
+  const modal = $('#modal-view-pending');
+  modal.dataset.pendingId = pendingId;
+  modal.dataset.uid = p.uid || '';
+  
+  show(modal);
+};
 
 window.approvePending = async function(pendingId, uid) {
   try {
@@ -1407,6 +1618,49 @@ function bindEvents() {
       const uid = $('#modal-view-blocked').dataset.userId;
       if (uid) {
         reactivateUser(uid);
+      }
+    });
+  }
+  
+  // Change Role modal controls
+  if ($('#btn-close-change-role')) {
+    $('#btn-close-change-role').addEventListener('click', () => hide($('#modal-change-role')));
+  }
+  if ($('#btn-cancel-change-role')) {
+    $('#btn-cancel-change-role').addEventListener('click', () => hide($('#modal-change-role')));
+  }
+  if ($('#btn-confirm-change-role')) {
+    $('#btn-confirm-change-role').addEventListener('click', () => {
+      saveUserRole();
+    });
+  }
+  
+  // Pending details modal controls
+  if ($('#btn-close-view-pending')) {
+    $('#btn-close-view-pending').addEventListener('click', () => hide($('#modal-view-pending')));
+  }
+  if ($('#btn-close-pending-details')) {
+    $('#btn-close-pending-details').addEventListener('click', () => hide($('#modal-view-pending')));
+  }
+  if ($('#btn-approve-from-modal')) {
+    $('#btn-approve-from-modal').addEventListener('click', () => {
+      const modal = $('#modal-view-pending');
+      const pendingId = modal.dataset.pendingId;
+      const uid = modal.dataset.uid;
+      if (pendingId) {
+        hide(modal);
+        approvePending(pendingId, uid);
+      }
+    });
+  }
+  if ($('#btn-reject-from-modal')) {
+    $('#btn-reject-from-modal').addEventListener('click', () => {
+      const modal = $('#modal-view-pending');
+      const pendingId = modal.dataset.pendingId;
+      const uid = modal.dataset.uid;
+      if (pendingId) {
+        hide(modal);
+        rejectPending(pendingId, uid);
       }
     });
   }

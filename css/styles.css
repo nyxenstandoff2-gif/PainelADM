@@ -510,6 +510,35 @@ textarea { resize: vertical; }
 .participant-item input { accent-color: var(--accent-gold); }
 .select-actions { display: flex; gap: 0.5rem; }
 
+/* === Last Winner Styles === */
+.participant-item.participant-blocked {
+  background: rgba(220, 53, 69, 0.05);
+  cursor: not-allowed;
+  opacity: 0.7;
+  position: relative;
+}
+.participant-item.participant-blocked:hover {
+  background: rgba(220, 53, 69, 0.05);
+}
+.participant-blocked input[type="checkbox"] {
+  accent-color: var(--accent-red);
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+.winner-badge {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  background: rgba(220, 53, 69, 0.15);
+  color: var(--accent-red);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-left: auto;
+}
+
 /* === Roulette === */
 .roulette-container { text-align: center; margin: 2rem 0; }
 .roulette-wrapper { position: relative; display: inline-block; }
@@ -573,7 +602,69 @@ textarea { resize: vertical; }
 .status-active { background: rgba(40,167,69,0.1); color: #28a745; }
 .status-pending { background: rgba(212,160,23,0.1); color: #d4a017; }
 .status-blocked { background: rgba(220,53,69,0.1); color: #dc3545; }
-.action-btns { display: flex; gap: 0.4rem; }
+
+/* === Role Badges === */
+.role-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.role-admin {
+  background: linear-gradient(135deg, rgba(212,160,23,0.2), rgba(184,134,11,0.2));
+  color: var(--accent-gold-dark);
+  border: 1px solid rgba(212,160,23,0.3);
+}
+.role-user {
+  background: rgba(108,117,125,0.1);
+  color: #6c757d;
+  border: 1px solid rgba(108,117,125,0.2);
+}
+
+/* === Role Change Modal === */
+.role-change-info {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+.role-change-info p {
+  margin-bottom: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.role-change-info p:last-child {
+  margin-bottom: 0;
+}
+.role-change-info strong {
+  color: var(--text-primary);
+}
+
+/* === Role Action Buttons === */
+.action-btn.role-btn-promote {
+  background: rgba(40,167,69,0.1);
+  color: #28a745;
+  border-color: rgba(40,167,69,0.3);
+}
+.action-btn.role-btn-promote:hover {
+  background: rgba(40,167,69,0.2);
+  border-color: #28a745;
+}
+.action-btn.role-btn-demote {
+  background: rgba(220,53,69,0.1);
+  color: #dc3545;
+  border-color: rgba(220,53,69,0.3);
+}
+.action-btn.role-btn-demote:hover {
+  background: rgba(220,53,69,0.2);
+  border-color: #dc3545;
+}
+
+.action-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .action-btn {
   background: none; border: 1px solid var(--border);
   width: 30px; height: 30px; border-radius: 4px;
@@ -681,6 +772,43 @@ textarea { resize: vertical; }
 .detail-reason {
   color: var(--danger);
   font-weight: 600;
+}
+
+/* === Pending Full Details Modal === */
+.pending-full-details {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.pending-detail-row {
+  display: flex;
+  flex-direction: column;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.pending-detail-row:first-child {
+  padding-top: 0;
+}
+.pending-detail-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.pending-detail-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+  font-family: var(--font-display);
+}
+.pending-detail-value {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 /* === Toast === */
