@@ -350,6 +350,8 @@ async function loadAdminsList() {
         sel.appendChild(opt);
       });
     }
+    // Atualizar também o dropdown de ADMs no sorteio
+    loadDrawAdminsList();
   } catch (err) {
     console.error('Error loading admins:', err);
   }
