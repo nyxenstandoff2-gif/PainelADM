@@ -400,6 +400,34 @@ async function handleRegister(e) {
   btn.querySelector('.btn-loader').classList.remove('hidden');
 
   try {
+    // Preparar WhatsApp ANTES de qualquer await (evita bloqueio de popup)
+    const selectedAdm = state.admins.find(a => a.id === admDestino);
+    const admOption = $('#reg-adm-destino').selectedOptions[0];
+    const admWhatsapp = selectedAdm?.whatsapp || admOption?.dataset.whatsapp || '';
+    const waNumber = admWhatsapp;
+    
+    if (waNumber) {
+      const waMessage = encodeURIComponent(
+        `📋 *NOVO CADASTRO - PAINEL ADM*\n\n` +
+        `*Nome:* ${nome}\n` +
+        `*Nick:* ${nick}\n` +
+        `*ID Conta:* ${contaid}\n` +
+        `*Email:* ${email}\n` +
+        `*WhatsApp:* ${whatsapp}\n` +
+        `*Gênero:* ${genero}\n` +
+        `*Nascimento:* ${formatBirth(nascimento)}\n\n` +
+        `⏳ Aguardando aprovação.`
+      );
+      // Usar link temporário para evitar bloqueio de popup
+      const link = document.createElement('a');
+      link.href = `https://wa.me/${waNumber}?text=${waMessage}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
     // Check if blocked
     const blockedQ = query(collection(db, 'blockedData'));
     const blockedSnap = await getDocs(blockedQ);
@@ -415,33 +443,12 @@ async function handleRegister(e) {
     const uid = cred.user.uid;
 
     // Save pending user data
-    const admOption = $('#reg-adm-destino').selectedOptions[0];
-    const admWhatsapp = admOption?.dataset.whatsapp || '';
-
     await addDoc(collection(db, 'pendingUsers'), {
       uid, nome, nick, contaid, whatsapp, email, nascimento, genero,
       admDestino, admWhatsapp,
       status: 'pending',
       createdAt: serverTimestamp()
     });
-
-    // WhatsApp redirect
-    const selectedAdm = state.admins.find(a => a.id === admDestino);
-    const waNumber = selectedAdm?.whatsapp || admWhatsapp;
-    const waMessage = encodeURIComponent(
-      `📋 *NOVO CADASTRO - PAINEL ADM*\n\n` +
-      `*Nome:* ${nome}\n` +
-      `*Nick:* ${nick}\n` +
-      `*ID Conta:* ${contaid}\n` +
-      `*Email:* ${email}\n` +
-      `*WhatsApp:* ${whatsapp}\n` +
-      `*Gênero:* ${genero}\n` +
-      `*Nascimento:* ${formatBirth(nascimento)}\n\n` +
-      `⏳ Aguardando aprovação.`
-    );
-    if (waNumber) {
-      window.open(`https://wa.me/${waNumber}?text=${waMessage}`, '_blank');
-    }
 
     $('#register-success').textContent = 'Cadastro realizado com sucesso! Aguarde a aprovação de um ADM.';
     show($('#register-success'));
@@ -1294,7 +1301,7 @@ function renderPendingUsers() {
       <div class="pending-card-actions">
         <button class="btn btn-outline btn-sm" onclick="viewPendingDetails('${p.id}')">👁️ Ver Detalhes</button>
         <button class="btn btn-danger btn-sm" onclick="rejectPending('${p.id}', '${p.uid || ''}')">❌ Rejeitar</button>
-        <button class="btn btn-accent btn-sm" onclick="approvePending('${p.id}', '${p.uid || ''}')">✅ Aprovar</button>
+        <button class="btn btn-accent btn-sm" onclick="approvePendingInline('${p.id}', '${p.uid || ''}')">✅ Aprovar</button>
       </div>
     </div>
   `).join('');
@@ -1334,6 +1341,32 @@ window.viewPendingDetails = function(pendingId) {
   show(modal);
 };
 
+// Wrapper síncrono para abrir WhatsApp antes do async (evita bloqueio de popup)
+window.approvePendingInline = function(pendingId, uid) {
+  const pendingData = state.pendingUsers.find(p => p.id === pendingId);
+  if (pendingData) {
+    const userWhats = pendingData.whatsapp || '';
+    if (userWhats) {
+      const groupLink = state.settings?.groupLink || '';
+      let message = `Olá ${pendingData.nome || pendingData.nick}!\n\n✅ Seu cadastro foi APROVADO!\n\nBem-vindo ao clan! `;
+      if (groupLink) {
+        message += `\n\n🔗 Acesse nosso grupo: ${groupLink}`;
+      }
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${userWhats}?text=${encodedMessage}`;
+      // Usar link temporário para evitar bloqueio de popup
+      const link = document.createElement('a');
+      link.href = whatsappUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+  approvePending(pendingId, uid);
+};
+
 window.approvePending = async function(pendingId, uid) {
   try {
     const pendingDoc = await getDoc(doc(db, 'pendingUsers', pendingId));
@@ -1355,24 +1388,7 @@ window.approvePending = async function(pendingId, uid) {
     // Remove pending
     await deleteDoc(doc(db, 'pendingUsers', pendingId));
     
-    // Send WhatsApp message with approval and group link
-    const groupLink = state.settings?.groupLink || '';
-    const userWhats = data.whatsapp || '';
-    
-    if (userWhats) {
-      let message = `Olá ${data.nome || data.nick}!\n\n✅ Seu cadastro foi APROVADO!\n\nBem-vindo ao clan! `;
-      
-      if (groupLink) {
-        message += `\n\n🔗 Acesse nosso grupo: ${groupLink}`;
-      }
-      
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${userWhats}?text=${encodedMessage}`;
-      
-      // Open WhatsApp in new tab
-      window.open(whatsappUrl, '_blank');
-      toast('Abrindo WhatsApp para enviar mensagem de aprovação...', 'info');
-    } else {
+    if (!data.whatsapp) {
       toast('Usuário aprovado com sucesso! (WhatsApp não cadastrado)', 'success');
     }
     
@@ -1841,6 +1857,29 @@ function bindEvents() {
       const pendingId = modal.dataset.pendingId;
       const uid = modal.dataset.uid;
       if (pendingId) {
+        // Abrir WhatsApp SINCRONAMENTE antes de qualquer await (evita bloqueio de popup)
+        const pendingData = state.pendingUsers.find(p => p.id === pendingId);
+        if (pendingData) {
+          const userWhats = pendingData.whatsapp || '';
+          if (userWhats) {
+            const groupLink = state.settings?.groupLink || '';
+            let message = `Olá ${pendingData.nome || pendingData.nick}!\n\n✅ Seu cadastro foi APROVADO!\n\nBem-vindo ao clan! `;
+            if (groupLink) {
+              message += `\n\n🔗 Acesse nosso grupo: ${groupLink}`;
+            }
+            const encodedMessage = encodeURIComponent(message);
+            const whatsappUrl = `https://wa.me/${userWhats}?text=${encodedMessage}`;
+            // Usar link temporário para evitar bloqueio de popup
+            const link = document.createElement('a');
+            link.href = whatsappUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }
+        }
+        
         hide(modal);
         approvePending(pendingId, uid);
       }
