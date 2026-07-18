@@ -2,12 +2,30 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>NYXEN CLAN - Painel ADM</title>
-  <link rel="icon" type="image/jpeg" href="assets/logo.jpeg">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png?v=2">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16.png?v=2">
+  <link rel="shortcut icon" href="assets/logo.jpeg?v=2">
+
+  <!-- Manifest (Android / Chrome "Adicionar à tela inicial") -->
+  <link rel="manifest" href="manifest.json?v=2">
+  <meta name="theme-color" content="#0a0a0f">
+
+  <!-- iOS "Adicionar à Tela de Início" -->
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NYXEN CLAN">
+
+  <!-- Android (Chrome) standalone -->
+  <meta name="mobile-web-app-capable" content="yes">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=9">
+  <link rel="stylesheet" href="css/styles.css?v=10">
 </head>
 <body>
 
@@ -22,7 +40,7 @@
     <div class="auth-container">
       <div class="auth-card">
         <div class="auth-logo">
-          <img src="assets/logo.jpeg" alt="NYXEN CLAN" class="auth-logo-img">
+          <img src="assets/logo.jpeg?v=2" alt="NYXEN CLAN" class="auth-logo-img">
           <h1>NYXEN CLAN</h1>
           <p class="auth-subtitle">Acesso ao Sistema do Clan</p>
         </div>
@@ -53,7 +71,7 @@
     <div class="auth-container">
       <div class="auth-card auth-card-wide">
         <div class="auth-logo">
-          <img src="assets/logo.jpeg" alt="NYXEN CLAN" class="auth-logo-img">
+          <img src="assets/logo.jpeg?v=2" alt="NYXEN CLAN" class="auth-logo-img">
           <h1>CADASTRO</h1>
           <p class="auth-subtitle">Preencha seus dados para ingressar no Clan</p>
         </div>
@@ -171,7 +189,7 @@
     <!-- Sidebar -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <img src="assets/logo.jpeg" alt="NYXEN CLAN" class="logo-icon-sm">
+        <img src="assets/logo.jpeg?v=2" alt="NYXEN CLAN" class="logo-icon-sm">
         <span class="sidebar-title">NYXEN CLAN</span>
       </div>
       <nav class="sidebar-nav">
@@ -896,6 +914,6 @@
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=11"></script>
 </body>
 </html>
