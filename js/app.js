@@ -1760,6 +1760,10 @@ function renderNumberPacks() {
       actions += ` <button class="btn btn-danger btn-sm" onclick="deleteNumberPack('${p.id}','${p.packName}')">🗑️ Excluir</button>`;
     }
 
+    const costLine = state.isAdmin
+      ? `Custo total: <strong>${formatBRL(p.costValue)}</strong> · Valor por número: <strong>${formatBRL(p.pricePerNumber)}</strong><br>`
+      : `Valor por número: <strong>${formatBRL(p.pricePerNumber)}</strong><br>`;
+
     return `
       <div class="${cardClass}">
         <div class="pack-card-header">
@@ -1768,7 +1772,7 @@ function renderNumberPacks() {
         </div>
         ${winnerBanner}
         <div class="pack-card-details">
-          Custo total: <strong>${formatBRL(p.costValue)}</strong> · Valor por número: <strong>${formatBRL(p.pricePerNumber)}</strong><br>
+          ${costLine}
           Vendidos: <strong>${p.soldCount || 0}/${p.totalNumbers}</strong> · Restam: <strong>${remaining}</strong> números<br>
           Publicado por: <strong>${p.createdByName || 'ADM'}</strong> em ${p.dateStr || '-'}
         </div>
