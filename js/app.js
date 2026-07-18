@@ -1887,7 +1887,7 @@ function handleConfirmBuyNumbers() {
     `*Quantidade:* ${qty} número(s)\n` +
     `*Valor por número:* ${formatBRL(pack.pricePerNumber)}\n` +
     `*Valor total:* ${formatBRL(total)}\n\n` +
-    `💰 Pagamento via Pix/dinheiro combinado diretamente com o ADM.\n` +
+    `💰 *Forma de pagamento: somente PIX.*\n` +
     `⏳ Aguardando confirmação do ADM para geração dos números.`
   );
   const link = document.createElement('a');
