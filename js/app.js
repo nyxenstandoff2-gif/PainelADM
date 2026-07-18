@@ -56,8 +56,19 @@ const state = {
   rouletteSpinning: false,
   nextDraw: null,
   countdownInterval: null,
-  settings: { groupLink: '' }
+  settings: { groupLink: '' },
+  numberSales: []
 };
+
+// === Gold Packs Catalog (preços fixos - vide tabela de referência) ===
+const GOLD_PACKS_CATALOG = [
+  { id: 'pack100',  name: '100 Gold Package',  gold: 100,  cost: 7.99 },
+  { id: 'pack300',  name: '300 Gold Package',  gold: 300,  cost: 23.97 },
+  { id: 'pack500',  name: '500 Gold Package',  gold: 500,  cost: 33.99 },
+  { id: 'pack3000', name: '3000 Gold Package', gold: 3000, cost: 129.99 },
+  { id: 'pack6000', name: '6000 Gold Package', gold: 6000, cost: 259.98 },
+  { id: 'pack9000', name: '9000 Gold Package', gold: 9000, cost: 389.97 },
+];
 
 // === DOM Helpers ===
 const $ = (sel) => document.querySelector(sel);
@@ -213,12 +224,14 @@ function updateUIForRole() {
     show($('#sorteio-admin-controls'));
     show($('#admin-settings'));
     show($('#admin-next-draw-controls'));
+    show($('#numbers-admin-publish'));
     loadDrawAdminsList();
   } else {
     $$('.admin-only').forEach(el => hide(el));
     hide($('#sorteio-admin-controls'));
     hide($('#admin-settings'));
     hide($('#admin-next-draw-controls'));
+    hide($('#numbers-admin-publish'));
   }
 
   // Fill profile
@@ -408,7 +421,7 @@ async function handleRegister(e) {
     
     if (waNumber) {
       const waMessage = encodeURIComponent(
-        `📋 *NOVO CADASTRO - PAINEL ADM*\n\n` +
+        `📋 *NOVO CADASTRO - NYXEN CLAN*\n\n` +
         `*Nome:* ${nome}\n` +
         `*Nick:* ${nick}\n` +
         `*ID Conta:* ${contaid}\n` +
@@ -1576,6 +1589,479 @@ window.deleteCode = async function(codeId, codeValue) {
 };
 
 // ============================================
+// NÚMEROS DA SORTE (venda de números para usuários)
+// ============================================
+function formatBRL(v) {
+  return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+// Usuários ativos e não-ADM (excluindo o ADM Master) - elegíveis para dividir o custo do pack
+async function getActiveEligibleUsers() {
+  try {
+    const q = query(collection(db, 'users'), where('status', '==', 'active'));
+    const snap = await getDocs(q);
+    const list = [];
+    snap.forEach(d => {
+      const u = d.data();
+      const email = (u.email || '').trim().toLowerCase();
+      if (u.role === 'admin') return;
+      if (email === MASTER_EMAIL.toLowerCase()) return;
+      list.push({ id: d.id, ...u });
+    });
+    return list;
+  } catch (err) {
+    console.error('Error loading eligible users:', err);
+    return [];
+  }
+}
+
+function populatePackSelect() {
+  const sel = $('#pack-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Selecione um pack...</option>';
+  GOLD_PACKS_CATALOG.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.name} — ${formatBRL(p.cost)}`;
+    sel.appendChild(opt);
+  });
+}
+
+async function handlePackSelectChange() {
+  const packId = $('#pack-select').value;
+  const preview = $('#pack-preview');
+  const btn = $('#btn-publish-pack');
+  if (!packId) {
+    preview.textContent = 'Selecione um pack para ver os detalhes.';
+    btn.disabled = true;
+    return;
+  }
+  const pack = GOLD_PACKS_CATALOG.find(p => p.id === packId);
+  preview.innerHTML = 'Calculando usuários elegíveis...';
+  const eligible = await getActiveEligibleUsers();
+  if (eligible.length === 0) {
+    preview.innerHTML = `<strong>${pack.name}</strong> — ${formatBRL(pack.cost)} · G ${pack.gold}<br>⚠️ Nenhum usuário ativo elegível encontrado.`;
+    btn.disabled = true;
+    return;
+  }
+  const pricePerNumber = pack.cost / eligible.length;
+  preview.innerHTML = `<strong>${pack.name}</strong> — ${formatBRL(pack.cost)} · G ${pack.gold}<br>
+    Usuários elegíveis: <strong>${eligible.length}</strong><br>
+    Total de números: <strong>${eligible.length}</strong><br>
+    Valor por número: <strong>${formatBRL(pricePerNumber)}</strong>`;
+  btn.disabled = false;
+}
+
+async function handlePublishPack() {
+  const packId = $('#pack-select').value;
+  if (!packId) return toast('Selecione um pack.', 'error');
+  const pack = GOLD_PACKS_CATALOG.find(p => p.id === packId);
+  if (!pack) return toast('Pack inválido.', 'error');
+
+  const btn = $('#btn-publish-pack');
+  btn.disabled = true;
+  try {
+    const eligible = await getActiveEligibleUsers();
+    if (eligible.length === 0) {
+      toast('Nenhum usuário ativo elegível para dividir o pack.', 'error');
+      btn.disabled = false;
+      return;
+    }
+    const totalNumbers = eligible.length;
+    const pricePerNumber = pack.cost / totalNumbers;
+
+    await addDoc(collection(db, 'numberSales'), {
+      packCatalogId: pack.id,
+      packName: pack.name,
+      gold: pack.gold,
+      costValue: pack.cost,
+      totalNumbers,
+      pricePerNumber,
+      soldCount: 0,
+      numbers: [],
+      purchases: [],
+      status: 'open',
+      createdBy: state.currentUser.uid,
+      createdByName: state.userProfile.nome || state.userProfile.nick || 'ADM',
+      createdAt: serverTimestamp(),
+      dateStr: nowFormatted()
+    });
+
+    toast('Pack publicado com sucesso!', 'success');
+    $('#pack-select').value = '';
+    $('#pack-preview').textContent = 'Selecione um pack para ver os detalhes.';
+    loadNumberSales();
+  } catch (err) {
+    console.error('Error publishing pack:', err);
+    toast('Erro ao publicar pack.', 'error');
+  }
+  btn.disabled = false;
+}
+
+function packRemaining(pack) {
+  return Math.max(0, (pack.totalNumbers || 0) - (pack.soldCount || 0));
+}
+
+async function loadNumberSales() {
+  try {
+    const snap = await getDocs(collection(db, 'numberSales'));
+    const packs = [];
+    snap.forEach(d => packs.push({ id: d.id, ...d.data() }));
+    packs.sort((a, b) => {
+      const ta = a.createdAt?.seconds || 0;
+      const tb = b.createdAt?.seconds || 0;
+      return tb - ta;
+    });
+    state.numberSales = packs;
+    renderNumberPacks();
+    renderNumbersHistory();
+  } catch (err) {
+    console.error('Error loading number sales:', err);
+  }
+}
+
+function renderNumberPacks() {
+  const container = $('#numbers-packs-list');
+  if (!container) return;
+  if (!state.numberSales.length) {
+    container.innerHTML = '<p class="empty-state">Nenhum pack disponível no momento.</p>';
+    return;
+  }
+
+  container.innerHTML = state.numberSales.map(p => {
+    const remaining = packRemaining(p);
+    const pct = p.totalNumbers ? Math.min(100, Math.round((p.soldCount / p.totalNumbers) * 100)) : 0;
+    const cardClass = p.status === 'drawn' ? 'pack-card drawn' : (p.status === 'sold_out' ? 'pack-card sold-out' : 'pack-card');
+    const statusBadge = p.status === 'drawn'
+      ? '<span class="status-badge status-active">🏆 Sorteado</span>'
+      : p.status === 'sold_out'
+      ? '<span class="status-badge status-blocked">Esgotado</span>'
+      : '<span class="status-badge status-active">Aberto</span>';
+
+    const winnerBanner = p.status === 'drawn' ? `
+      <div class="pack-winner-banner">
+        🏆 Número sorteado: <span class="lucky-number">${p.drawnNumber}</span> — Vencedor: <strong>${p.drawnWinnerName || '-'}</strong>
+      </div>` : '';
+
+    let actions = `<button class="btn btn-outline btn-sm" onclick="openPackHistoryModal('${p.id}')">📜 Ver Histórico</button>`;
+    if (p.status === 'open') {
+      if (state.isAdmin) {
+        actions += ` <button class="btn btn-primary btn-sm" onclick="openRegisterSaleModal('${p.id}')">➕ Registrar Venda</button>`;
+      } else {
+        actions += ` <button class="btn btn-accent btn-sm" onclick="openBuyNumbersModal('${p.id}')">🎟️ Comprar Números</button>`;
+      }
+    } else if (p.status === 'sold_out' && state.isAdmin) {
+      actions += ` <button class="btn btn-accent btn-sm" onclick="drawPackWinner('${p.id}')">🎯 Sortear Vencedor</button>`;
+    }
+    if (state.isAdmin && p.status !== 'drawn') {
+      actions += ` <button class="btn btn-danger btn-sm" onclick="deleteNumberPack('${p.id}','${p.packName}')">🗑️ Excluir</button>`;
+    }
+
+    return `
+      <div class="${cardClass}">
+        <div class="pack-card-header">
+          <div><span class="pack-card-title">${p.packName}</span><span class="pack-card-gold">G ${p.gold}</span></div>
+          ${statusBadge}
+        </div>
+        ${winnerBanner}
+        <div class="pack-card-details">
+          Custo total: <strong>${formatBRL(p.costValue)}</strong> · Valor por número: <strong>${formatBRL(p.pricePerNumber)}</strong><br>
+          Vendidos: <strong>${p.soldCount || 0}/${p.totalNumbers}</strong> · Restam: <strong>${remaining}</strong> números<br>
+          Publicado por: <strong>${p.createdByName || 'ADM'}</strong> em ${p.dateStr || '-'}
+        </div>
+        <div class="pack-stock-bar"><div class="pack-stock-fill" style="width:${pct}%"></div></div>
+        <div class="pack-card-actions">${actions}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderNumbersHistory() {
+  const container = $('#numbers-history-list');
+  const title = $('#numbers-history-title');
+  if (!container) return;
+
+  let purchases = [];
+  state.numberSales.forEach(p => {
+    (p.purchases || []).forEach(pu => {
+      purchases.push({ ...pu, packName: p.packName, gold: p.gold });
+    });
+  });
+
+  if (!state.isAdmin) {
+    title.textContent = '📋 Meu Histórico de Compras';
+    const uid = state.currentUser?.uid;
+    purchases = purchases.filter(pu => pu.userId === uid);
+  } else {
+    title.textContent = '📋 Histórico Geral de Vendas';
+  }
+
+  purchases.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+  if (!purchases.length) {
+    container.innerHTML = '<p class="empty-state">Nenhuma compra registrada ainda.</p>';
+    return;
+  }
+
+  container.innerHTML = purchases.map(pu => `
+    <div class="purchase-history-item">
+      <div><strong>${pu.packName}</strong> (G ${pu.gold}) — ${pu.quantity} número(s) — ${formatBRL(pu.value)}</div>
+      ${!state.isAdmin ? '' : `<div>Comprador: <strong>${pu.userName}</strong></div>`}
+      <div>Números: ${(pu.numbers || []).map(n => `<span class="lucky-number">${n}</span>`).join('')}</div>
+      <div>Confirmado por: <strong>${pu.confirmedByName || 'ADM'}</strong> em ${pu.dateStr || '-'}</div>
+    </div>
+  `).join('');
+}
+
+// --- Comprar Números (Usuário) ---
+window.openBuyNumbersModal = function(packId) {
+  const pack = state.numberSales.find(p => p.id === packId);
+  if (!pack) return;
+  const remaining = packRemaining(pack);
+  if (remaining <= 0) return toast('Este pack está esgotado.', 'error');
+
+  $('#buy-pack-id').value = packId;
+  $('#buy-pack-info').innerHTML = `<strong>${pack.packName}</strong> — Valor por número: <strong>${formatBRL(pack.pricePerNumber)}</strong>`;
+  $('#buy-quantity').value = 1;
+  $('#buy-quantity').max = remaining;
+  $('#buy-quantity-hint').textContent = `Disponível: ${remaining} números`;
+
+  const sel = $('#buy-adm-destino');
+  sel.innerHTML = '<option value="">Selecione um ADM...</option>';
+  state.admins.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.nick || a.nome;
+    opt.dataset.whatsapp = a.whatsapp;
+    sel.appendChild(opt);
+  });
+
+  updateBuyTotalPreview();
+  show($('#modal-buy-numbers'));
+};
+
+function updateBuyTotalPreview() {
+  const pack = state.numberSales.find(p => p.id === $('#buy-pack-id').value);
+  if (!pack) return;
+  let qty = parseInt($('#buy-quantity').value) || 0;
+  const remaining = packRemaining(pack);
+  if (qty > remaining) qty = remaining;
+  if (qty < 1) qty = 1;
+  $('#buy-quantity').value = qty;
+  $('#buy-total-preview').textContent = `Total: ${formatBRL(qty * pack.pricePerNumber)}`;
+}
+
+function handleConfirmBuyNumbers() {
+  const packId = $('#buy-pack-id').value;
+  const pack = state.numberSales.find(p => p.id === packId);
+  if (!pack) return;
+  const qty = parseInt($('#buy-quantity').value) || 0;
+  const remaining = packRemaining(pack);
+  if (qty < 1 || qty > remaining) return toast('Quantidade inválida.', 'error');
+
+  const admSelect = $('#buy-adm-destino');
+  const admOption = admSelect.selectedOptions[0];
+  const admWhatsapp = admOption?.dataset.whatsapp;
+  if (!admSelect.value || !admWhatsapp) return toast('Selecione um ADM.', 'error');
+
+  const total = qty * pack.pricePerNumber;
+  const p = state.userProfile;
+  const waMessage = encodeURIComponent(
+    `🔢 *PEDIDO DE NÚMEROS DA SORTE - NYXEN CLAN*\n\n` +
+    `*Pack:* ${pack.packName} (G ${pack.gold})\n` +
+    `*Comprador:* ${p?.nick || p?.nome || '-'}\n` +
+    `*ID Conta:* ${p?.contaid || '-'}\n` +
+    `*Quantidade:* ${qty} número(s)\n` +
+    `*Valor por número:* ${formatBRL(pack.pricePerNumber)}\n` +
+    `*Valor total:* ${formatBRL(total)}\n\n` +
+    `💰 Pagamento via Pix/dinheiro combinado diretamente com o ADM.\n` +
+    `⏳ Aguardando confirmação do ADM para geração dos números.`
+  );
+  const link = document.createElement('a');
+  link.href = `https://wa.me/${admWhatsapp}?text=${waMessage}`;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  hide($('#modal-buy-numbers'));
+  toast('Pedido enviado via WhatsApp! Aguarde a confirmação do ADM.', 'success');
+}
+
+// --- Registrar Venda Confirmada (Admin) ---
+window.openRegisterSaleModal = async function(packId) {
+  const pack = state.numberSales.find(p => p.id === packId);
+  if (!pack) return;
+  const remaining = packRemaining(pack);
+  if (remaining <= 0) return toast('Este pack está esgotado.', 'error');
+
+  $('#sale-pack-id').value = packId;
+  $('#sale-pack-info').innerHTML = `<strong>${pack.packName}</strong> — Valor por número: <strong>${formatBRL(pack.pricePerNumber)}</strong>`;
+  $('#sale-quantity').value = 1;
+  $('#sale-quantity').max = remaining;
+  $('#sale-quantity-hint').textContent = `Disponível: ${remaining} números`;
+
+  const sel = $('#sale-user-select');
+  sel.innerHTML = '<option value="">Carregando usuários...</option>';
+  const eligible = await getActiveEligibleUsers();
+  sel.innerHTML = '<option value="">Selecione o usuário...</option>';
+  eligible.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = `${u.nick || u.nome} (ID: ${u.contaid || '-'})`;
+    opt.dataset.nome = u.nick || u.nome;
+    sel.appendChild(opt);
+  });
+
+  updateSaleTotalPreview();
+  show($('#modal-register-sale'));
+};
+
+function updateSaleTotalPreview() {
+  const pack = state.numberSales.find(p => p.id === $('#sale-pack-id').value);
+  if (!pack) return;
+  let qty = parseInt($('#sale-quantity').value) || 0;
+  const remaining = packRemaining(pack);
+  if (qty > remaining) qty = remaining;
+  if (qty < 1) qty = 1;
+  $('#sale-quantity').value = qty;
+  $('#sale-total-preview').textContent = `Total: ${formatBRL(qty * pack.pricePerNumber)}`;
+}
+
+function generateUniqueNumbers(count, existingNumbers) {
+  const used = new Set(existingNumbers);
+  const result = [];
+  while (result.length < count) {
+    const n = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    if (!used.has(n)) {
+      used.add(n);
+      result.push(n);
+    }
+  }
+  return result;
+}
+
+async function handleConfirmRegisterSale() {
+  const packId = $('#sale-pack-id').value;
+  const pack = state.numberSales.find(p => p.id === packId);
+  if (!pack) return;
+
+  const userSel = $('#sale-user-select');
+  const userId = userSel.value;
+  if (!userId) return toast('Selecione um usuário.', 'error');
+  const userName = userSel.selectedOptions[0]?.dataset.nome || 'Usuário';
+
+  const qty = parseInt($('#sale-quantity').value) || 0;
+  const remaining = packRemaining(pack);
+  if (qty < 1 || qty > remaining) return toast('Quantidade inválida.', 'error');
+
+  const btn = $('#btn-confirm-register-sale');
+  btn.disabled = true;
+  try {
+    const newNumbers = generateUniqueNumbers(qty, pack.numbers || []);
+    const value = qty * pack.pricePerNumber;
+    const purchase = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      userId, userName,
+      quantity: qty,
+      numbers: newNumbers,
+      value,
+      confirmedByName: state.userProfile.nome || state.userProfile.nick || 'ADM',
+      confirmedByUid: state.currentUser.uid,
+      date: new Date().toISOString(),
+      dateStr: nowFormatted()
+    };
+
+    const updatedNumbers = [...(pack.numbers || []), ...newNumbers];
+    const updatedPurchases = [...(pack.purchases || []), purchase];
+    const newSoldCount = (pack.soldCount || 0) + qty;
+    const newStatus = newSoldCount >= pack.totalNumbers ? 'sold_out' : 'open';
+
+    await updateDoc(doc(db, 'numberSales', packId), {
+      numbers: updatedNumbers,
+      purchases: updatedPurchases,
+      soldCount: newSoldCount,
+      status: newStatus
+    });
+
+    toast(`Venda registrada! Números gerados: ${newNumbers.join(', ')}`, 'success');
+    hide($('#modal-register-sale'));
+    loadNumberSales();
+  } catch (err) {
+    console.error('Error registering sale:', err);
+    toast('Erro ao registrar venda.', 'error');
+  }
+  btn.disabled = false;
+}
+
+// --- Sortear Vencedor ---
+window.drawPackWinner = async function(packId) {
+  const pack = state.numberSales.find(p => p.id === packId);
+  if (!pack) return;
+  if (!pack.numbers || !pack.numbers.length) return toast('Nenhum número vendido neste pack.', 'error');
+  if (!confirm(`Sortear o vencedor do pack "${pack.packName}"? Esta ação não pode ser desfeita.`)) return;
+
+  try {
+    const drawnNumber = pack.numbers[Math.floor(Math.random() * pack.numbers.length)];
+    const winningPurchase = (pack.purchases || []).find(pu => (pu.numbers || []).includes(drawnNumber));
+
+    await updateDoc(doc(db, 'numberSales', packId), {
+      status: 'drawn',
+      drawnNumber,
+      drawnWinnerId: winningPurchase?.userId || '',
+      drawnWinnerName: winningPurchase?.userName || 'Desconhecido',
+      drawnAt: serverTimestamp(),
+      drawnAtStr: nowFormatted()
+    });
+
+    toast(`🏆 Número sorteado: ${drawnNumber} — Vencedor: ${winningPurchase?.userName || 'Desconhecido'}`, 'success');
+    loadNumberSales();
+  } catch (err) {
+    console.error('Error drawing pack winner:', err);
+    toast('Erro ao sortear vencedor.', 'error');
+  }
+};
+
+window.deleteNumberPack = async function(packId, packName) {
+  if (!confirm(`Deseja realmente excluir o pack "${packName}"? Vendas já registradas serão perdidas.`)) return;
+  try {
+    await deleteDoc(doc(db, 'numberSales', packId));
+    toast('Pack excluído.', 'info');
+    loadNumberSales();
+  } catch (err) {
+    console.error('Error deleting pack:', err);
+    toast('Erro ao excluir pack.', 'error');
+  }
+};
+
+window.openPackHistoryModal = function(packId) {
+  const pack = state.numberSales.find(p => p.id === packId);
+  if (!pack) return;
+  $('#pack-history-title').textContent = `📋 ${pack.packName} — Números Vendidos`;
+  const list = $('#pack-history-list');
+  const purchases = pack.purchases || [];
+
+  const winnerBanner = pack.status === 'drawn' ? `
+    <div class="pack-winner-banner">
+      🏆 Número sorteado: <span class="lucky-number">${pack.drawnNumber}</span> — Vencedor: <strong>${pack.drawnWinnerName || '-'}</strong> em ${pack.drawnAtStr || '-'}
+    </div>` : '';
+
+  if (!purchases.length) {
+    list.innerHTML = winnerBanner + '<p class="empty-state">Nenhuma venda registrada ainda para este pack.</p>';
+  } else {
+    list.innerHTML = winnerBanner + purchases.map(pu => `
+      <div class="purchase-history-item">
+        <div><strong>${pu.userName}</strong> — ${pu.quantity} número(s) — ${formatBRL(pu.value)}</div>
+        <div>Números: ${(pu.numbers || []).map(n => `<span class="lucky-number${pack.drawnNumber === n ? ' winner-badge' : ''}">${n}</span>`).join('')}</div>
+        <div>Confirmado por: <strong>${pu.confirmedByName || 'ADM'}</strong> em ${pu.dateStr || '-'}</div>
+      </div>
+    `).join('');
+  }
+  show($('#modal-pack-history'));
+};
+
+// ============================================
 // PROFILE EDIT (own data)
 // ============================================
 function openEditProfile() {
@@ -1659,6 +2145,21 @@ function bindEvents() {
   $('#form-edit-profile').addEventListener('submit', handleEditProfile);
   $('#form-register-code').addEventListener('submit', handleRegisterCode);
 
+  // Números da Sorte
+  populatePackSelect();
+  $('#pack-select').addEventListener('change', handlePackSelectChange);
+  $('#btn-publish-pack').addEventListener('click', handlePublishPack);
+  $('#buy-quantity').addEventListener('input', updateBuyTotalPreview);
+  $('#btn-confirm-buy-numbers').addEventListener('click', handleConfirmBuyNumbers);
+  $('#btn-cancel-buy-numbers').addEventListener('click', () => hide($('#modal-buy-numbers')));
+  $('#btn-close-buy-numbers').addEventListener('click', () => hide($('#modal-buy-numbers')));
+  $('#sale-quantity').addEventListener('input', updateSaleTotalPreview);
+  $('#btn-confirm-register-sale').addEventListener('click', handleConfirmRegisterSale);
+  $('#btn-cancel-register-sale').addEventListener('click', () => hide($('#modal-register-sale')));
+  $('#btn-close-register-sale').addEventListener('click', () => hide($('#modal-register-sale')));
+  $('#btn-close-pack-history').addEventListener('click', () => hide($('#modal-pack-history')));
+  $('#btn-close-pack-history-2').addEventListener('click', () => hide($('#modal-pack-history')));
+
   // Logout
   $('#btn-logout').addEventListener('click', handleLogout);
 
@@ -1671,6 +2172,7 @@ function bindEvents() {
       if (item.dataset.tab === 'gerenciamento') loadUsersTable();
       if (item.dataset.tab === 'historico') loadRegistrationHistory();
       if (item.dataset.tab === 'codigos') loadCodes();
+      if (item.dataset.tab === 'numeros') loadNumberSales();
     });
   });
 
@@ -1699,6 +2201,17 @@ function bindEvents() {
     const valor = parseFloat($('#draw-valor').value) || 0;
     state.drawConfig.valor = valor;
     state.drawConfig.participantes = Array.from(state.selectedParticipants);
+
+    // Desenha a pré-visualização da roleta com os participantes selecionados
+    const canvas = $('#roulette-canvas');
+    const ctx = canvas.getContext('2d');
+    const names = state.drawConfig.participantes.map(id => {
+      const u = state.allUsers.find(u => u.id === id);
+      return u ? (u.nick || u.nome) : id;
+    });
+    hide($('#roulette-result'));
+    drawWheel(ctx, canvas, names, 0);
+
     toast('Configuração de sorteio salva!', 'success');
   });
   $('#btn-select-all').addEventListener('click', () => {
