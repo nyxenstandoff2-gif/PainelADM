@@ -1763,6 +1763,12 @@ function renderNumberPacks() {
     const costLine = state.isAdmin
       ? `Custo total: <strong>${formatBRL(p.costValue)}</strong> · Valor por número: <strong>${formatBRL(p.pricePerNumber)}</strong><br>`
       : `Valor por número: <strong>${formatBRL(p.pricePerNumber)}</strong><br>`;
+    const stockLine = state.isAdmin
+      ? `Vendidos: <strong>${p.soldCount || 0}/${p.totalNumbers}</strong> · Restam: <strong>${remaining}</strong> números<br>`
+      : '';
+    const stockBar = state.isAdmin
+      ? `<div class="pack-stock-bar"><div class="pack-stock-fill" style="width:${pct}%"></div></div>`
+      : '';
 
     return `
       <div class="${cardClass}">
@@ -1773,10 +1779,10 @@ function renderNumberPacks() {
         ${winnerBanner}
         <div class="pack-card-details">
           ${costLine}
-          Vendidos: <strong>${p.soldCount || 0}/${p.totalNumbers}</strong> · Restam: <strong>${remaining}</strong> números<br>
+          ${stockLine}
           Publicado por: <strong>${p.createdByName || 'ADM'}</strong> em ${p.dateStr || '-'}
         </div>
-        <div class="pack-stock-bar"><div class="pack-stock-fill" style="width:${pct}%"></div></div>
+        ${stockBar}
         <div class="pack-card-actions">${actions}</div>
       </div>
     `;
@@ -1831,7 +1837,7 @@ window.openBuyNumbersModal = function(packId) {
   $('#buy-pack-info').innerHTML = `<strong>${pack.packName}</strong> — Valor por número: <strong>${formatBRL(pack.pricePerNumber)}</strong>`;
   $('#buy-quantity').value = 1;
   $('#buy-quantity').max = remaining;
-  $('#buy-quantity-hint').textContent = `Disponível: ${remaining} números`;
+  $('#buy-quantity-hint').textContent = 'Informe quantos números deseja comprar.';
 
   const sel = $('#buy-adm-destino');
   sel.innerHTML = '<option value="">Selecione um ADM...</option>';
