@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel ADM - Clan</title>
+  <title>NYXEN CLAN - Painel ADM</title>
+  <link rel="icon" type="image/jpeg" href="assets/logo.jpeg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=7">
+  <link rel="stylesheet" href="css/styles.css?v=9">
 </head>
 <body>
 
@@ -21,8 +22,8 @@
     <div class="auth-container">
       <div class="auth-card">
         <div class="auth-logo">
-          <div class="logo-icon">⚔</div>
-          <h1>PAINEL ADM</h1>
+          <img src="assets/logo.jpeg" alt="NYXEN CLAN" class="auth-logo-img">
+          <h1>NYXEN CLAN</h1>
           <p class="auth-subtitle">Acesso ao Sistema do Clan</p>
         </div>
         <form id="form-login" autocomplete="off">
@@ -52,7 +53,7 @@
     <div class="auth-container">
       <div class="auth-card auth-card-wide">
         <div class="auth-logo">
-          <div class="logo-icon">⚔</div>
+          <img src="assets/logo.jpeg" alt="NYXEN CLAN" class="auth-logo-img">
           <h1>CADASTRO</h1>
           <p class="auth-subtitle">Preencha seus dados para ingressar no Clan</p>
         </div>
@@ -170,13 +171,17 @@
     <!-- Sidebar -->
     <aside id="sidebar">
       <div class="sidebar-header">
-        <div class="logo-icon-sm">⚔</div>
-        <span class="sidebar-title">PAINEL ADM</span>
+        <img src="assets/logo.jpeg" alt="NYXEN CLAN" class="logo-icon-sm">
+        <span class="sidebar-title">NYXEN CLAN</span>
       </div>
       <nav class="sidebar-nav">
         <a href="#" class="nav-item active" data-tab="sorteio">
           <span class="nav-icon">🎰</span>
           <span class="nav-label">Sorteio</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="numeros">
+          <span class="nav-icon">🔢</span>
+          <span class="nav-label">Números da Sorte</span>
         </a>
         <a href="#" class="nav-item admin-only hidden" data-tab="gerenciamento">
           <span class="nav-icon">👥</span>
@@ -332,6 +337,121 @@
           <h3>📋 Histórico de Sorteios</h3>
           <div id="draw-history" class="history-list">
             <p class="empty-state">Nenhum sorteio realizado ainda.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: Números da Sorte -->
+      <section id="tab-numeros" class="tab-content hidden">
+        <div class="tab-header">
+          <h2>🔢 Números da Sorte</h2>
+        </div>
+
+        <!-- Admin: Publicar Novo Pack -->
+        <div id="numbers-admin-publish" class="card hidden">
+          <h3>📦 Publicar Novo Pack para Venda</h3>
+          <p class="field-hint" style="margin-bottom:1rem;">Selecione um pack. O custo será dividido igualmente entre os usuários ativos (não-ADM) e cada um poderá comprar quantos números quiser, até esgotar o estoque.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="pack-select">Selecionar Pack</label>
+              <select id="pack-select">
+                <option value="">Selecione um pack...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prévia do Pack</label>
+              <div id="pack-preview" class="pack-preview">Selecione um pack para ver os detalhes.</div>
+            </div>
+          </div>
+          <button id="btn-publish-pack" class="btn btn-primary" disabled>🚀 Publicar Pack</button>
+        </div>
+
+        <!-- Packs Disponíveis -->
+        <div class="card">
+          <h3>🎟️ Packs Disponíveis</h3>
+          <div id="numbers-packs-list">
+            <p class="empty-state">Nenhum pack disponível no momento.</p>
+          </div>
+        </div>
+
+        <!-- Histórico de Compras -->
+        <div class="card">
+          <h3 id="numbers-history-title">📋 Histórico de Compras</h3>
+          <div id="numbers-history-list">
+            <p class="empty-state">Nenhuma compra registrada ainda.</p>
+          </div>
+        </div>
+
+        <!-- Modal: Comprar Números (Usuário) -->
+        <div id="modal-buy-numbers" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content modal-sm">
+            <div class="modal-header">
+              <h3>🎟️ Comprar Números</h3>
+              <button class="modal-close" id="btn-close-buy-numbers">&times;</button>
+            </div>
+            <input type="hidden" id="buy-pack-id">
+            <p id="buy-pack-info" class="pack-preview"></p>
+            <div class="form-group">
+              <label for="buy-quantity">Quantidade de Números</label>
+              <input type="number" id="buy-quantity" min="1" step="1" value="1">
+              <span class="field-hint" id="buy-quantity-hint">Disponível: -</span>
+            </div>
+            <div class="form-group">
+              <label for="buy-adm-destino">Enviar pedido para (ADM) <span class="req">*</span></label>
+              <select id="buy-adm-destino" required>
+                <option value="">Selecione um ADM...</option>
+              </select>
+            </div>
+            <div class="pack-preview" id="buy-total-preview">Total: R$ 0,00</div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" id="btn-cancel-buy-numbers">Cancelar</button>
+              <button type="button" class="btn btn-accent" id="btn-confirm-buy-numbers">📲 Enviar Pedido via WhatsApp</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Registrar Venda Confirmada (Admin) -->
+        <div id="modal-register-sale" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content modal-sm">
+            <div class="modal-header">
+              <h3>✅ Registrar Venda Confirmada</h3>
+              <button class="modal-close" id="btn-close-register-sale">&times;</button>
+            </div>
+            <input type="hidden" id="sale-pack-id">
+            <p id="sale-pack-info" class="pack-preview"></p>
+            <div class="form-group">
+              <label for="sale-user-select">Usuário</label>
+              <select id="sale-user-select" required>
+                <option value="">Selecione o usuário...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="sale-quantity">Quantidade Confirmada</label>
+              <input type="number" id="sale-quantity" min="1" step="1" value="1">
+              <span class="field-hint" id="sale-quantity-hint">Disponível: -</span>
+            </div>
+            <div class="pack-preview" id="sale-total-preview">Total: R$ 0,00</div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" id="btn-cancel-register-sale">Cancelar</button>
+              <button type="button" class="btn btn-primary" id="btn-confirm-register-sale">💾 Confirmar Venda e Gerar Números</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Histórico Completo do Pack -->
+        <div id="modal-pack-history" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3 id="pack-history-title">📋 Números Vendidos</h3>
+              <button class="modal-close" id="btn-close-pack-history">&times;</button>
+            </div>
+            <div id="pack-history-list"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" id="btn-close-pack-history-2">Fechar</button>
+            </div>
           </div>
         </div>
       </section>
