@@ -69,6 +69,8 @@ const GOLD_PACKS_CATALOG = [
   { id: 'pack6000', name: '6000 Gold Package', gold: 6000, cost: 259.98 },
   { id: 'pack9000', name: '9000 Gold Package', gold: 9000, cost: 389.97 },
 ];
+// Preço de venda = custo x 2 (100% para cobrir o custo do pack + 100% de lucro)
+const PACK_PRICE_MULTIPLIER = 2;
 
 // === DOM Helpers ===
 const $ = (sel) => document.querySelector(sel);
@@ -1644,11 +1646,12 @@ async function handlePackSelectChange() {
     btn.disabled = true;
     return;
   }
-  const pricePerNumber = pack.cost / eligible.length;
-  preview.innerHTML = `<strong>${pack.name}</strong> — ${formatBRL(pack.cost)} · G ${pack.gold}<br>
+  const pricePerNumber = (pack.cost * PACK_PRICE_MULTIPLIER) / eligible.length;
+  preview.innerHTML = `<strong>${pack.name}</strong> — Custo: ${formatBRL(pack.cost)} · G ${pack.gold}<br>
     Usuários elegíveis: <strong>${eligible.length}</strong><br>
     Total de números: <strong>${eligible.length}</strong><br>
-    Valor por número: <strong>${formatBRL(pricePerNumber)}</strong>`;
+    Valor total a arrecadar (200%): <strong>${formatBRL(pack.cost * PACK_PRICE_MULTIPLIER)}</strong><br>
+    Valor por número: <strong>${formatBRL(pricePerNumber)}</strong> <span style="color:var(--accent-green)">(100% custo + 100% lucro)</span>`;
   btn.disabled = false;
 }
 
@@ -1668,7 +1671,7 @@ async function handlePublishPack() {
       return;
     }
     const totalNumbers = eligible.length;
-    const pricePerNumber = pack.cost / totalNumbers;
+    const pricePerNumber = (pack.cost * PACK_PRICE_MULTIPLIER) / totalNumbers;
 
     await addDoc(collection(db, 'numberSales'), {
       packCatalogId: pack.id,
