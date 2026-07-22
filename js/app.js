@@ -72,6 +72,17 @@ const GOLD_PACKS_CATALOG = [
 // Preço de venda = custo x 2 (100% para cobrir o custo do pack + 100% de lucro)
 const PACK_PRICE_MULTIPLIER = 2;
 
+// Motivos de exclusão/bloqueio (usado tanto no modal de detalhes quanto na tela de login)
+const DELETE_REASON_MAP = {
+  'preconceito': 'Preconceito',
+  'toxicidade': 'Toxicidade',
+  'nao_ativo': 'Não Ativo',
+  'pedido_saida': 'Pedido de Saída do Clan'
+};
+
+// Listener em tempo real do documento do usuário logado (detecta bloqueio/exclusão)
+let userDocUnsubscribe = null;
+
 // === DOM Helpers ===
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -144,11 +155,50 @@ async function handleLogin(e) {
 }
 
 async function handleLogout() {
+  stopWatchingUserStatus();
   await signOut(auth);
   state.currentUser = null;
   state.userProfile = null;
   state.isAdmin = false;
   showScreen('login');
+}
+
+// Desloga um usuário cuja conta foi excluída/bloqueada por um ADM,
+// e exibe o motivo na tela de login (funciona tanto no login quanto com o site já aberto)
+async function forceLogoutBlockedUser(profileData) {
+  stopWatchingUserStatus();
+  const reason = DELETE_REASON_MAP[profileData?.deleteReason] || profileData?.deleteReason;
+  if (auth.currentUser) {
+    await signOut(auth);
+  }
+  state.currentUser = null;
+  state.userProfile = null;
+  state.isAdmin = false;
+  showScreen('login');
+  $('#login-error').textContent = reason
+    ? `Sua conta foi excluída do clan. Motivo: ${reason}.`
+    : 'Sua conta foi excluída do clan.';
+  show($('#login-error'));
+}
+
+// Passa a escutar em tempo real o documento do usuário logado, para detectar
+// bloqueio/exclusão feita por um ADM enquanto o usuário está com o site aberto
+function watchUserStatus(uid) {
+  stopWatchingUserStatus();
+  userDocUnsubscribe = onSnapshot(doc(db, 'users', uid), (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.status === 'blocked') {
+      forceLogoutBlockedUser(data);
+    }
+  });
+}
+
+function stopWatchingUserStatus() {
+  if (userDocUnsubscribe) {
+    userDocUnsubscribe();
+    userDocUnsubscribe = null;
+  }
 }
 
 // ============================================
@@ -157,7 +207,13 @@ async function handleLogout() {
 async function loadUserProfile(uid) {
   const userDoc = await getDoc(doc(db, 'users', uid));
   if (userDoc.exists()) {
-    state.userProfile = { id: uid, ...userDoc.data() };
+    const data = userDoc.data();
+    // Conta excluída/bloqueada pelo ADM: nunca deixar entrar, mesmo com sessão válida
+    if (data.status === 'blocked') {
+      await forceLogoutBlockedUser(data);
+      return;
+    }
+    state.userProfile = { id: uid, ...data };
     state.isAdmin = state.userProfile.role === 'admin';
     updateUIForRole();
     // Load settings if admin
@@ -1051,13 +1107,7 @@ window.viewBlockedUser = function(uid) {
   $('#blocked-name').textContent = user.nome || user.nick || '-';
   
   // Translate reason
-  const reasonMap = {
-    'preconceito': 'Preconceito',
-    'toxicidade': 'Toxicidade',
-    'nao_ativo': 'Não Ativo',
-    'pedido_saida': 'Pedido de Saída do Clan'
-  };
-  $('#blocked-reason').textContent = reasonMap[user.deleteReason] || user.deleteReason || 'Não informado';
+  $('#blocked-reason').textContent = DELETE_REASON_MAP[user.deleteReason] || user.deleteReason || 'Não informado';
   $('#blocked-observation').textContent = user.deleteObservacao || 'Nenhuma observação';
   
   // Format date if available
@@ -2465,6 +2515,11 @@ function initAuthListener() {
       state.currentUser = user;
       await loadUserProfile(user.uid);
 
+      // Conta excluída/bloqueada: loadUserProfile já deslogou e mostrou o motivo
+      if (!auth.currentUser) {
+        return;
+      }
+
       // Check if user is pending
       if (state.userProfile?._pending) {
         toast('Seu cadastro está pendente de aprovação.', 'info');
@@ -2478,6 +2533,7 @@ function initAuthListener() {
       setInterval(updateClock, 1000);
       initRoulette();
       loadAdminsList();
+      watchUserStatus(user.uid);
     } else {
       state.currentUser = null;
       state.userProfile = null;
