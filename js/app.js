@@ -707,6 +707,32 @@ function spinRoulette() {
   requestAnimationFrame(animate);
 }
 
+// ============================================
+// LIMPEZA AUTOMÁTICA DE HISTÓRICO ANTIGO (40 dias)
+// ============================================
+const HISTORY_RETENTION_DAYS = 40;
+
+function isOlderThanRetention(value) {
+  if (!value) return false;
+  const ms = value?.seconds ? value.seconds * 1000 : new Date(value).getTime();
+  if (!ms || isNaN(ms)) return false;
+  const diffDays = (Date.now() - ms) / (1000 * 60 * 60 * 24);
+  return diffDays > HISTORY_RETENTION_DAYS;
+}
+
+async function cleanupOldDocs(collectionName, records, getDateValue) {
+  const old = records.filter(r => isOlderThanRetention(getDateValue(r)));
+  if (old.length === 0) return records;
+  try {
+    await Promise.all(old.map(r => deleteDoc(doc(db, collectionName, r.id))));
+  } catch (err) {
+    console.error(`Error cleaning old ${collectionName}:`, err);
+    return records;
+  }
+  const oldIds = new Set(old.map(r => r.id));
+  return records.filter(r => !oldIds.has(r.id));
+}
+
 async function saveDrawHistory(winnerId, winnerName, valor, participantIds) {
   const admSelect = $('#draw-adm-info');
   const selectedOption = admSelect.selectedOptions[0];
@@ -734,9 +760,12 @@ async function loadDrawHistory() {
   try {
     const q = query(collection(db, 'drawHistory'));
     const snap = await getDocs(q);
-    state.drawHistory = [];
-    snap.forEach(d => state.drawHistory.push({ id: d.id, ...d.data() }));
-    state.drawHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    let drawHistory = [];
+    snap.forEach(d => drawHistory.push({ id: d.id, ...d.data() }));
+    // Apagar sorteios com mais de 40 dias
+    drawHistory = await cleanupOldDocs('drawHistory', drawHistory, r => r.createdAt || r.date);
+    drawHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    state.drawHistory = drawHistory;
     renderDrawHistory();
   } catch (err) {
     console.error('Error loading history:', err);
@@ -938,6 +967,10 @@ function renderUsersTable(users) {
     return;
   }
   hide($('#no-users-msg'));
+
+  // Separar ativos/pendentes dos bloqueados (bloqueados sempre por último, em grupo à parte)
+  const activeUsers = users.filter(u => u.status !== 'blocked');
+  const blockedUsers = users.filter(u => u.status === 'blocked');
   
   // Check if mobile
   const isMobile = window.innerWidth <= 768;
@@ -967,7 +1000,7 @@ function renderUsersTable(users) {
   if (isMobile) {
     // Mobile: render as cards in separate container
     const cardsList = $('#users-cards-list');
-    cardsList.innerHTML = users.map(u => {
+    const renderCard = (u) => {
       const isBlocked = u.status === 'blocked';
       const cardClass = isBlocked ? 'user-card blocked' : 'user-card';
       
@@ -1018,12 +1051,21 @@ function renderUsersTable(users) {
           </div>
         </div>
       `;
-    }).join('');
+    };
+
+    let html = activeUsers.map(renderCard).join('');
+    if (blockedUsers.length > 0 && activeUsers.length > 0) {
+      html += `<div class="user-group-divider">🚫 Bloqueados</div>`;
+      html += blockedUsers.map(renderCard).join('');
+    } else if (blockedUsers.length > 0) {
+      html += blockedUsers.map(renderCard).join('');
+    }
+    cardsList.innerHTML = html;
     
     // CSS handles visibility via .desktop-only / .mobile-only
   } else {
     // Desktop: render as table
-    tbody.innerHTML = users.map(u => {
+    const renderRow = (u) => {
       const isBlocked = u.status === 'blocked';
       const baseActions = isBlocked
         ? `<button class="action-btn" onclick="viewBlockedUser('${u.id}')" title="Ver Detalhes" style="background: rgba(231, 76, 60, 0.1); color: #e74c3c;">👁️</button>
@@ -1050,7 +1092,16 @@ function renderUsersTable(users) {
           </td>
         </tr>
       `;
-    }).join('');
+    };
+
+    let html = activeUsers.map(renderRow).join('');
+    if (blockedUsers.length > 0 && activeUsers.length > 0) {
+      html += `<tr class="user-group-divider-row"><td colspan="8">🚫 Bloqueados</td></tr>`;
+      html += blockedUsers.map(renderRow).join('');
+    } else if (blockedUsers.length > 0) {
+      html += blockedUsers.map(renderRow).join('');
+    }
+    tbody.innerHTML = html;
   }
 }
 
@@ -1492,8 +1543,11 @@ async function loadCodes() {
     const pendingCodes = codes.filter(c => c.status === 'pending')
       .sort((a, b) => new Date(b.createdAt?.seconds * 1000 || 0) - new Date(a.createdAt?.seconds * 1000 || 0));
     
-    const redeemedCodes = codes.filter(c => c.status === 'redeemed')
+    let redeemedCodes = codes.filter(c => c.status === 'redeemed')
       .sort((a, b) => new Date(b.redeemedAt?.seconds * 1000 || 0) - new Date(a.redeemedAt?.seconds * 1000 || 0));
+
+    // Apagar códigos resgatados com mais de 40 dias
+    redeemedCodes = await cleanupOldDocs('codes', redeemedCodes, r => r.redeemedAt || r.createdAt);
 
     renderPendingCodes(pendingCodes);
     renderRedeemedCodes(redeemedCodes);
