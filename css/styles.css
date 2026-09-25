@@ -496,6 +496,10 @@ textarea { resize: vertical; }
   font-size: 0.9rem;
   color: var(--text-primary);
   font-weight: 600;
+  overflow-wrap: break-word;
+}
+.next-draw-date {
+  max-width: 100%;
 }
 .form-actions {
   display: flex;
@@ -887,6 +891,10 @@ textarea { resize: vertical; }
     height: 44px;
     font-size: 1.3rem;
   }
+  input[type="datetime-local"] {
+    font-size: 0.78rem;
+    padding: 0.6rem 0.4rem;
+  }
 }
 
 /* Mobile (up to 768px) */
@@ -920,6 +928,11 @@ textarea { resize: vertical; }
   .mobile-menu-btn:active {
     transform: scale(0.95);
     background: var(--bg-card-hover);
+  }
+  /* Ensure the hamburger button actually disappears while the sidebar
+     drawer is open, instead of floating on top of the sidebar logo/nav */
+  .mobile-menu-btn.hidden {
+    display: none !important;
   }
   
   /* Mobile Overlay */
@@ -961,6 +974,19 @@ textarea { resize: vertical; }
   }
   .form-group {
     margin-bottom: 1rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* datetime-local's native widget doesn't shrink below its own content
+     width in some mobile browsers, so it can overflow narrow cards
+     (e.g. the "Data e Hora" field on the Sorteio tab) even with
+     width:100% set. Force it to respect the container instead. */
+  input[type="datetime-local"] {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    font-size: 0.85rem;
+    padding: 0.65rem 0.6rem;
   }
   
   /* Tab Headers */

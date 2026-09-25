@@ -2482,8 +2482,10 @@ function bindEvents() {
       sidebar.classList.toggle('open');
       if (sidebar.classList.contains('open')) {
         overlay.classList.remove('hidden');
+        $('#mobile-menu-btn').classList.add('hidden');
       } else {
         overlay.classList.add('hidden');
+        $('#mobile-menu-btn').classList.remove('hidden');
       }
     });
   }
@@ -2492,6 +2494,7 @@ function bindEvents() {
     $('#mobile-overlay').addEventListener('click', () => {
       $('#sidebar').classList.remove('open');
       $('#mobile-overlay').classList.add('hidden');
+      $('#mobile-menu-btn').classList.remove('hidden');
     });
   }
   
@@ -2501,6 +2504,7 @@ function bindEvents() {
       if (window.innerWidth <= 768) {
         $('#sidebar').classList.remove('open');
         $('#mobile-overlay').classList.add('hidden');
+        $('#mobile-menu-btn').classList.remove('hidden');
       }
     });
   });
