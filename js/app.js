@@ -409,18 +409,6 @@ async function loadAdminsList() {
         state.admins.push({ id: d.id, nome: data.nome, nick: data.nick, whatsapp: wa });
       }
     });
-    // Also populate the register form dropdown
-    const sel = $('#reg-adm-destino');
-    if (sel) {
-      sel.innerHTML = '<option value="">Selecione um ADM...</option>';
-      state.admins.forEach(a => {
-        const opt = document.createElement('option');
-        opt.value = a.id;
-        opt.textContent = `${a.nick || a.nome}`;
-        opt.dataset.whatsapp = a.whatsapp;
-        sel.appendChild(opt);
-      });
-    }
     // Atualizar também o dropdown de ADMs no sorteio
     loadDrawAdminsList();
   } catch (err) {
@@ -446,7 +434,6 @@ async function handleRegister(e) {
   hide($('#register-success'));
 
   const nome = $('#reg-nome').value.trim();
-  const nick = $('#reg-nick').value.trim();
   const contaid = $('#reg-contaid').value.trim();
   const whatsapp = $('#reg-whatsapp').value.trim();
   const email = $('#reg-email').value.trim();
@@ -454,51 +441,20 @@ async function handleRegister(e) {
   const nascimento = $('#reg-nascimento').value.trim();
   const genero = document.querySelector('input[name="reg-genero"]:checked')?.value;
   const aceitarRegras = $('#reg-aceitar-regras').checked;
-  const admDestino = $('#reg-adm-destino').value;
 
   // Validations
   if (!/^[A-Za-zÀ-ÿ\s]+$/.test(nome)) return showError('register-error', 'Nome deve conter apenas letras.');
-  if (!/^[A-Za-z0-9]+$/.test(nick)) return showError('register-error', 'Nickname deve conter apenas letras e números.');
   if (!/^[0-9]{1,9}$/.test(contaid)) return showError('register-error', 'ID da conta deve ter até 9 números.');
   if (!/^[0-9]+$/.test(whatsapp)) return showError('register-error', 'WhatsApp deve conter apenas números.');
   if (!/^[0-9]{8}$/.test(nascimento)) return showError('register-error', 'Data de nascimento inválida (DDMMAAAA).');
   if (!genero) return showError('register-error', 'Selecione o gênero.');
   if (!aceitarRegras) return showError('register-error', 'Você deve aceitar as regras do Clan.');
-  if (!admDestino) return showError('register-error', 'Selecione um ADM para enviar os dados.');
 
   const btn = e.target.querySelector('button[type="submit"]');
   btn.querySelector('.btn-text').classList.add('hidden');
   btn.querySelector('.btn-loader').classList.remove('hidden');
 
   try {
-    // Preparar WhatsApp ANTES de qualquer await (evita bloqueio de popup)
-    const selectedAdm = state.admins.find(a => a.id === admDestino);
-    const admOption = $('#reg-adm-destino').selectedOptions[0];
-    const admWhatsapp = selectedAdm?.whatsapp || admOption?.dataset.whatsapp || '';
-    const waNumber = admWhatsapp;
-    
-    if (waNumber) {
-      const waMessage = encodeURIComponent(
-        `📋 *NOVO CADASTRO - NYXEN CLAN*\n\n` +
-        `*Nome:* ${nome}\n` +
-        `*Nick:* ${nick}\n` +
-        `*ID Conta:* ${contaid}\n` +
-        `*Email:* ${email}\n` +
-        `*WhatsApp:* ${whatsapp}\n` +
-        `*Gênero:* ${genero}\n` +
-        `*Nascimento:* ${formatBirth(nascimento)}\n\n` +
-        `⏳ Aguardando aprovação.`
-      );
-      // Usar link temporário para evitar bloqueio de popup
-      const link = document.createElement('a');
-      link.href = `https://wa.me/${waNumber}?text=${waMessage}`;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
     // Check if blocked
     const blockedQ = query(collection(db, 'blockedData'));
     const blockedSnap = await getDocs(blockedQ);
@@ -513,10 +469,9 @@ async function handleRegister(e) {
     const cred = await createUserWithEmailAndPassword(auth, email, senha);
     const uid = cred.user.uid;
 
-    // Save pending user data
+    // Save pending user data (fica no painel aguardando aprovação de qualquer ADM)
     await addDoc(collection(db, 'pendingUsers'), {
-      uid, nome, nick, contaid, whatsapp, email, nascimento, genero,
-      admDestino, admWhatsapp,
+      uid, nome, contaid, whatsapp, email, nascimento, genero,
       status: 'pending',
       createdAt: serverTimestamp()
     });
@@ -1036,7 +991,7 @@ function renderUsersTable(users) {
           <div class="user-card-header">
             <div class="user-card-identity">
               <div class="user-card-nick">${u.nick || u.nome}</div>
-              <div class="user-card-name">${u.nome !== u.nick ? u.nome : ''}</div>
+              <div class="user-card-name">${u.nick && u.nome !== u.nick ? u.nome : ''}</div>
             </div>
             <div class="user-card-badges">
               ${getRoleBadge(u)}
@@ -1354,7 +1309,6 @@ function renderPendingUsers() {
       <div class="pending-card-header">
         <div>
           <span class="pending-card-name">${p.nome || '-'}</span>
-          <span class="pending-card-nick"> @${p.nick || '-'}</span>
         </div>
         <span class="status-badge status-pending">Pendente</span>
       </div>
@@ -1378,17 +1332,11 @@ window.viewPendingDetails = function(pendingId) {
   if (!p) return;
   
   $('#pending-view-nome').textContent = p.nome || '-';
-  $('#pending-view-nick').textContent = p.nick || '-';
   $('#pending-view-contaid').textContent = p.contaid || '-';
   $('#pending-view-email').textContent = p.email || '-';
   $('#pending-view-whatsapp').textContent = p.whatsapp || '-';
   $('#pending-view-nascimento').textContent = p.nascimento ? formatBirth(p.nascimento) : '-';
   $('#pending-view-genero').textContent = p.genero || '-';
-  
-  // Show ADM destination
-  const admUser = state.admins.find(a => a.id === p.admDestino);
-  $('#pending-view-adm').textContent = admUser ? (admUser.nick || admUser.nome) : (p.admDestino || '-');
-  $('#pending-view-adm-whatsapp').textContent = p.admWhatsapp || '-';
   
   // Show registration date
   if (p.createdAt) {
@@ -1440,7 +1388,7 @@ window.approvePending = async function(pendingId, uid) {
 
     // Create user record
     await setDoc(doc(db, 'users', uid || pendingId), {
-      nome: data.nome, nick: data.nick, contaid: data.contaid,
+      nome: data.nome, contaid: data.contaid,
       whatsapp: data.whatsapp, email: data.email,
       nascimento: data.nascimento, genero: data.genero,
       role: 'user', status: 'active',
@@ -2241,9 +2189,8 @@ function bindEvents() {
 
   // Input masks
   $('#reg-nome').addEventListener('input', maskOnlyLetters);
-  $('#reg-nick').addEventListener('input', maskAlphaNum);
   $('#reg-contaid').addEventListener('input', maskOnlyNumbers);
-  $('#reg-whatsapp').addEventListener('input', maskOnlyNumbers);
+  $('#reg-whatsapp')?.addEventListener('input', maskOnlyNumbers);
   $('#reg-nascimento').addEventListener('input', maskOnlyNumbers);
   $('#edit-nome').addEventListener('input', maskOnlyLetters);
   $('#edit-nick').addEventListener('input', maskAlphaNum);
@@ -2539,8 +2486,6 @@ function initAuthListener() {
       state.userProfile = null;
       state.isAdmin = false;
       showScreen('login');
-      // Carregar lista de ADMs com WhatsApp para o formulario de cadastro
-      // (nao depende do ADM estar online no site - envio 24h via WhatsApp)
       loadAdminsList();
     }
   });
@@ -2550,8 +2495,17 @@ function initAuthListener() {
 // INIT
 // ============================================
 function init() {
-  bindEvents();
-  initAuthListener();
+  try {
+    bindEvents();
+  } catch (err) {
+    console.error('Erro ao iniciar eventos da interface:', err);
+  }
+  try {
+    initAuthListener();
+  } catch (err) {
+    console.error('Erro ao iniciar autenticação:', err);
+    hide($('#loading-screen'));
+  }
 }
 
 init();
